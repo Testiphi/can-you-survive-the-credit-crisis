@@ -131,6 +131,10 @@ export {
   type BorrowQuoteInput,
 } from './securities-lending.ts';
 export {
+  RealPriceSource,
+  REAL_PATH_SHOCK_SCALE,
+} from './market-data.ts';
+export {
   GameEngine,
   timelineOf,
   type Dataset,

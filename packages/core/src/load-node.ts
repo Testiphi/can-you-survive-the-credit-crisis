@@ -9,7 +9,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { EventCard, InstitutionsFile } from './types.ts';
+import type { EventCard, InstitutionsFile, MarketData } from './types.ts';
 import type { RumorsFile } from './news.ts';
 import type { Dataset } from './engine.ts';
 
@@ -21,6 +21,10 @@ export function repoRoot(): string {
 
 export function eventsDir(): string {
   return join(repoRoot(), 'data', 'events');
+}
+
+export function processedDir(): string {
+  return join(repoRoot(), 'data', 'processed');
 }
 
 function readJson<T>(path: string): T {
@@ -46,6 +50,18 @@ export function loadRumors(dir = eventsDir()): RumorsFile {
   return readJson<RumorsFile>(join(dir, 'rumors.json'));
 }
 
+/**
+ * 载入数据管道产出的真实历史市场数据。
+ *
+ * 可选：文件不存在时返回 undefined，引擎会退回「锚点插值 + beta + 噪声」
+ * 的合成路径。这样 CI 与没跑过管道的环境依然能正常工作。
+ */
+export function loadMarketData(dir = processedDir()): MarketData | undefined {
+  const path = join(dir, 'market.json');
+  if (!existsSync(path)) return undefined;
+  return readJson<MarketData>(path);
+}
+
 /** 一次性载入完整数据集。 */
 export function loadDataset(dir = eventsDir()): Dataset {
   if (!existsSync(dir)) {
@@ -55,5 +71,6 @@ export function loadDataset(dir = eventsDir()): Dataset {
     events: loadEvents(dir),
     institutions: loadInstitutions(dir),
     rumors: loadRumors(dir),
+    market: loadMarketData(),
   };
 }

@@ -142,6 +142,14 @@ export function marketRolloverRate(stress: number): number {
 export interface MacroScheduleOptions {
   /** 噪声强度倍率，0 = 完全按历史锚点 */
   noiseScale?: number;
+  /**
+   * 真实标普收盘价序列（按交易日）。
+   *
+   * 提供时用它替代锚点插值作为基础路径——这是数据管道接入后的主路径。
+   * 此时**不再叠加锚点噪声**：真实数据本身就是历史，
+   * 再加一层 ±0.4% 的日噪声只会让标普偏离事实。
+   */
+  spxSeries?: Map<string, number>;
 }
 
 /**
@@ -157,9 +165,11 @@ export function buildMacroSeries(
   const scale = options.noiseScale ?? 1;
   const days = tradingDaysBetween(startDate, endDate);
   const out: MacroState[] = [];
+  const real = options.spxSeries;
 
   for (const date of days) {
-    const spxBase = interpLog(SPX_ANCHORS, date);
+    const realClose = real?.get(date);
+    const spxBase = realClose ?? interpLog(SPX_ANCHORS, date);
     const credit = interpLog(CREDIT_SPREAD_ANCHORS, date);
     const vix = interpLog(VIX_ANCHORS, date);
     const ted = interpLog(TED_ANCHORS, date);
@@ -168,7 +178,8 @@ export function buildMacroSeries(
     const creditN = credit * (1 + 0.05 * scale * noise.normal());
     const vixN = Math.max(9, vix * (1 + 0.07 * scale * noise.normal()));
     const tedN = Math.max(0.05, ted * (1 + 0.06 * scale * noise.normal()));
-    const spxN = spxBase * (1 + 0.004 * scale * noise.normal());
+    // 真实路径不加噪声；只有锚点插值时才加，否则会出现折点
+    const spxN = realClose !== undefined ? spxBase : spxBase * (1 + 0.004 * scale * noise.normal());
 
     const stress = systemicStress(creditN, tedN, vixN);
 

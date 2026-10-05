@@ -7,9 +7,16 @@ dist/
 build/
 *.tsbuildinfo
 
-# data pipeline scratch (raw downloads are not committed)
+# 数据管道的中间产物（原始下载不入库）
 data/raw/
+
+# 管道产出：market.json **要入库**。
+# 它是 411 KB 的静态产物，入库之后：
+#   · CI 与没跑过管道的环境构建依然可用
+#   · 网页端直接 import 它，运行时不发网络请求
+# 其余 processed 文件仍是中间产物，不入库。
 data/processed/*.json
+!data/processed/market.json
 !data/processed/.gitkeep
 
 # python

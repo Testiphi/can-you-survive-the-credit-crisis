@@ -379,3 +379,35 @@ export interface TurnResult {
   marginCall: boolean;
   bankrupt: boolean;
 }
+
+// ---------------------------------------------------------------- 真实历史数据
+
+/** 数据管道产出的一根日线。 */
+export interface MarketBar {
+  date: DateStr;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  /** 该根由管道回填（数据源存在缺口），不是原始数据 */
+  filled?: boolean;
+}
+
+/**
+ * `data/processed/market.json` 的结构。
+ *
+ * 由 `data/pipeline/build_market.py` 生成。覆盖范围取决于数据源：
+ * 能取到真实历史的（存续机构与指数）走真实路径，
+ * 取不到的（退市机构）留在 synthetic 里走事件驱动的合成路径。
+ */
+export interface MarketData {
+  version: number;
+  source: string;
+  sourceNote?: string;
+  range: [DateStr, DateStr];
+  fetchedAt?: string;
+  gapFillNote?: string;
+  series: Record<string, MarketBar[]>;
+  synthetic: Record<string, string>;
+}

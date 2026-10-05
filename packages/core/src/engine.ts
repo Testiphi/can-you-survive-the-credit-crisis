@@ -19,6 +19,7 @@ import type {
   InstitutionState,
   InstitutionsFile,
   MacroState,
+  MarketData,
   NewsItem,
   Order,
   PlayerAction,
@@ -63,11 +64,20 @@ import {
 import { createAgents, flowToReturn, stepAgents } from './agents.ts';
 import { generateRumors, newsFromEvent, type GeneratedRumor, type RumorsFile } from './news.ts';
 import { makeContext } from './conditions.ts';
+import { RealPriceSource, REAL_PATH_SHOCK_SCALE } from './market-data.ts';
 
 export interface Dataset {
   events: EventCard[];
   institutions: InstitutionsFile;
   rumors: RumorsFile;
+  /**
+   * 真实历史市场数据（`data/processed/market.json`）。
+   *
+   * 可选：不提供时全部标的走「锚点插值 + beta + 噪声」的合成路径。
+   * 提供时，有真实历史的标的改走真实路径，事件在其上做小幅扰动。
+   * 见 market-data.ts。
+   */
+  market?: MarketData;
 }
 
 export interface EngineOptions {
@@ -120,6 +130,9 @@ export class GameEngine {
   private rumorCooldownUntil: Map<string, number> = new Map();
   private opts: EngineOptions;
 
+  /** 真实历史价格源。为 null 时全部标的走合成路径。 */
+  private realPrices: RealPriceSource | null = null;
+
   constructor(dataset: Dataset, options: EngineOptions = {}) {
     this.dataset = dataset;
     this.opts = options;
@@ -134,9 +147,13 @@ export class GameEngine {
 
     const diff = DIFFICULTY_PROFILE[this.config.difficulty];
 
+    this.realPrices = dataset.market ? new RealPriceSource(dataset.market) : null;
+
     this.streams = createStreams(this.config.seed);
     this.baseMacro = buildMacroSeries(this.config.startDate, this.config.endDate, this.streams.market, {
       noiseScale: diff.noiseScale,
+      // 有真实标普序列时用它作基础路径，锚点插值只在缺口处兜底
+      spxSeries: this.realPrices?.spxSeries(),
     });
     this.macroIndexByDate = new Map(this.baseMacro.map((m, i) => [m.date, i]));
 
@@ -172,21 +189,25 @@ export class GameEngine {
     const startMacro = this.baseMacro[0];
     const account = createAccount(this.config.initialCapital);
 
-    // 初始 K 线：所有标的以起始价开盘
+    // 初始 K 线。
+    // 有真实数据的标的用真实的首个收盘价作为起始价——否则从 2007-01-02
+    // 到数据起点之间会出现一段跳空。
     const bars = new Map<string, Bar[]>();
     const prices = new Map<string, number>();
     for (const inst of INSTRUMENTS) {
-      prices.set(inst.id, inst.startPrice);
-      this.prevPrices.set(inst.id, inst.startPrice);
+      const realFirst = this.realPrices?.firstBar(inst.id);
+      const startPrice = realFirst ? realFirst.close : inst.startPrice;
+      prices.set(inst.id, startPrice);
+      this.prevPrices.set(inst.id, startPrice);
       this.adv20.set(inst.id, inst.baseAdv);
       bars.set(inst.id, [
         {
           date: this.config.startDate,
-          open: inst.startPrice,
-          high: inst.startPrice,
-          low: inst.startPrice,
-          close: inst.startPrice,
-          volume: Math.round(inst.baseAdv / inst.startPrice),
+          open: startPrice,
+          high: startPrice,
+          low: startPrice,
+          close: startPrice,
+          volume: realFirst?.volume || Math.round(inst.baseAdv / Math.max(0.5, startPrice)),
           adv20: inst.baseAdv,
         },
       ]);
@@ -369,11 +390,56 @@ export class GameEngine {
     const newBars = new Map<string, Bar>();
     for (const inst of INSTRUMENTS) {
       const prevClose = this.state.prices.get(inst.id) ?? inst.startPrice;
+      const prevAdv = this.adv20.get(inst.id) ?? inst.baseAdv;
+
+      // ---- 真实历史路径 ----
+      // 标普由下方的基础路径兜底（它已经用真实序列驱动），其余标的直接用
+      // 真实 K 线乘以事件扰动乘数。
+      const realBar = inst.id === 'SPX' ? undefined : this.realPrices?.barFor(inst.id, nextDate);
+      if (realBar) {
+        // 真实路径标的：事件冲击按 REAL_PATH_SHOCK_SCALE 衰减后**当日**施加。
+        // 真实数据里已经包含该事件的历史影响，全额叠加就是双重计入；
+        // 而不做永久累积，则让真实路径在后续交易日自然把它拉回去。
+        const shock = (mods.perInstrument.get(inst.id) ?? 0) * REAL_PATH_SHOCK_SCALE;
+        const mult = 1 + shock;
+        const close = round2(Math.max(0.01, realBar.close * mult));
+        // 回填的 K 线 volume 为 0，用 adv20 反推一个合理值
+        const volume =
+          realBar.volume > 0
+            ? realBar.volume
+            : Math.round(prevAdv / Math.max(0.5, realBar.close));
+        const dollarVolume = volume * close;
+        const adv20 = Math.round(prevAdv * 0.9 + dollarVolume * 0.1);
+
+        const bar: Bar = {
+          date: nextDate,
+          open: round2(Math.max(0.01, realBar.open * mult)),
+          high: round2(Math.max(0.01, realBar.high * mult)),
+          low: round2(Math.max(0.01, realBar.low * mult)),
+          close,
+          volume,
+          adv20,
+        };
+
+        // 已死亡机构仍要单向衰减（真实数据里收购后的走势不适合作为抵押品估值）
+        const dead = this.state.institutions[inst.id]?.alive === false;
+        if (dead) {
+          bar.close = round2(Math.max(0.01, Math.min(bar.close, prevClose * 0.97)));
+          bar.high = round2(Math.max(bar.open, bar.close));
+          bar.low = round2(Math.max(0.01, Math.min(bar.open, bar.close, bar.low)));
+        }
+
+        newBars.set(inst.id, bar);
+        this.adv20.set(inst.id, adv20);
+        continue;
+      }
+
+      // ---- 合成路径（无真实数据：雷曼/贝尔斯登/美林/华盛顿互惠/两房） ----
       const extra =
         (mods.perInstrument.get(inst.id) ?? 0) +
         flowToReturn(
           agentFlow.get(inst.id) ?? 0,
-          this.adv20.get(inst.id) ?? inst.baseAdv,
+          prevAdv,
           this.state.macro.liquidity,
           diff.impactEta,
           inst.idioVol,
@@ -385,7 +451,7 @@ export class GameEngine {
         spxReturn,
         this.streams.market,
         this.state.macro,
-        this.adv20.get(inst.id) ?? inst.baseAdv,
+        prevAdv,
         extra,
       );
 
@@ -533,11 +599,16 @@ export class GameEngine {
     const rawIndex = jittered.indexReturn ?? 0;
     const scaledIndex = rawIndex * INDEX_SHOCK_SCALE;
     this.returnShock.index += scaledIndex;
-    // SPX 与个股一样**永久**累积事件冲击。
-    // 早前 SPX 的收盘价每天被基础路径拉回，冲击当天就蒸发了，
-    // 而个股却把冲击永久留在价格里——两者不一致，
-    // 结果是标普贴合历史、个股被系统性多杀一倍。
-    this.indexShockMultiplier *= 1 + scaledIndex;
+
+    // SPX 的累计冲击乘数**只在没有真实数据时**累积。
+    //
+    // 有真实数据时，标普的基础路径本身就是历史（已经包含崩盘），
+    // 再累积事件冲击会造成永久性水平位移——实测标普期末会低 7%
+    // （1032 vs 实际的 1115）。此时事件只应做「再计时扰动」，
+    // 即影响当日收益，由真实路径在后续交易日把它拉回去。
+    if (!this.realPrices) {
+      this.indexShockMultiplier *= 1 + scaledIndex;
+    }
 
     const resolved = resolveImpact(jittered);
     for (const [id, v] of resolved.perInstrument) {
