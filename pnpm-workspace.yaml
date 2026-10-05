@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+# esbuild 需要执行安装脚本以放置原生二进制；Vite 依赖它。
+# 只放行这一个经过确认的依赖，其余保持默认拒绝。
+allowBuilds:
+  esbuild: true

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  core:
+    name: 引擎测试与数据校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 引擎零依赖，不需要 npm install 就能跑测试
+      - name: 引擎测试
+        run: node --test "packages/core/test/*.test.ts"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 事件卡数据集校验
+        run: python tools/validate_events.py
+
+      - name: 检查事件目录文档与数据是否同步
+        run: python tools/gen_timeline.py --check
+
+      - name: 平衡报告（冒烟）
+        run: node packages/core/test/balance-report.ts 4 1
+
+  web:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @cyscc/web build

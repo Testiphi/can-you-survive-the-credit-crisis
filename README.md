@@ -54,7 +54,32 @@
 | **引擎（`packages/core`）** | ✅ **完成**：RNG / 日历 / 条件求值 / 宏观 / 事件引擎 / 竞争风险 / 市场 / 账户 / 融资 / 监管 / NPC / 传闻 |
 | 测试 | ✅ **46 个用例全绿**（含确定性与防未来函数断言） |
 | 平衡报告工具 | ✅ 5 种策略机器人 + 事件触发率统计 |
-| UI（`apps/web`） | ⬜ 未开始 |
+| UI（`apps/web`） | ✅ **P0 原型**：K线 + 新闻流 + 多/空/清仓三按钮 + 账户与监管面板 |
+
+## 运行
+
+```bash
+# 引擎测试（零依赖，不需要 npm install）
+node --test "packages/core/test/*.test.ts"
+
+# 跑一局完整模拟并打印过程
+node packages/core/test/manual-sim.ts 42 1 cash      # [seed] [难度] [策略]
+# 策略: cash | long | short | short-then-long | random
+
+# 平衡报告：5 种策略机器人 × N 局
+node packages/core/test/balance-report.ts 20 1      # [局数] [难度]
+
+# 数据集校验 / 时间线同步
+python tools/validate_events.py
+python tools/gen_timeline.py --write
+python tools/gen_timeline.py --check
+
+# 前端
+pnpm install
+pnpm --filter @cyscc/web dev        # 开发服务器
+pnpm --filter @cyscc/web build      # 生产构建 → apps/web/dist
+pnpm --filter @cyscc/web preview    # 预览构建产物
+```
 
 ## 数据与工具
 
