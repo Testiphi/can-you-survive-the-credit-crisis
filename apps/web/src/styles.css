@@ -398,3 +398,136 @@ tr.clickable:hover {
 .curve-legend b {
   font-weight: 600;
 }
+
+/* ---------------- 悬浮提示 ---------------- */
+
+/* 渲染在 document 层级，因此不会被 .col 的 overflow 裁掉 */
+.tip-layer {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: #10161f;
+  border: 1px solid #2b3849;
+  border-radius: 4px;
+  padding: 9px 12px;
+  color: #cfdae6;
+  font-size: 11.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.6);
+}
+
+/* 可悬停的术语标记 */
+.tip-target {
+  cursor: help;
+  border-bottom: 1px dotted #4a5866;
+  outline: none;
+}
+
+.tip-target:hover,
+.tip-target:focus {
+  border-bottom-color: var(--accent);
+  color: #e8eef5;
+}
+
+/* ---------------- 情境提示 ---------------- */
+
+.hint {
+  padding: 9px 11px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.hint.info {
+  background: #101d2a;
+  border: 1px solid #24425c;
+  color: #a8cdec;
+}
+
+.hint.warn {
+  background: #2a2110;
+  border: 1px solid #6b5524;
+  color: #ffd98a;
+}
+
+.hint.danger {
+  background: #2a1113;
+  border: 1px solid #6b2427;
+  color: #ffb3b5;
+}
+
+/* 面板标题上的「ⓘ」提示标记 */
+.panel h3 .tip-target {
+  border-bottom: none;
+  color: var(--dim);
+  font-weight: 400;
+}
+
+/* ---------------- 行情数据面板 ---------------- */
+
+.quote-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.quote-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #1a222d;
+}
+
+.quote-head .sym {
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.quote-head .px {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.quote-head .chg {
+  font-size: 12px;
+}
+
+.quote-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid #12181f;
+  font-size: 11.5px;
+}
+
+.quote-row:last-child {
+  border-bottom: none;
+}
+
+.quote-row .k {
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.quote-row .v {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 低难度下被隐藏的区块 */
+.locked-note {
+  padding: 9px 11px;
+  border: 1px dashed #2b3849;
+  border-radius: 4px;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.6;
+}

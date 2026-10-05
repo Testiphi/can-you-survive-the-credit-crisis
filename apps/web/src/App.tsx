@@ -16,6 +16,9 @@ import {
 import { dataset } from './dataset.ts';
 import { KLineChart } from './KLineChart.tsx';
 import { EquityChart } from './EquityChart.tsx';
+import { Tip, useTip } from './Tip.tsx';
+import { BUTTON_TIPS, GLOSSARY, buildHints } from './glossary.ts';
+import { QuotePanel, computeQuote } from './QuotePanel.tsx';
 
 const TRADABLE = INSTRUMENTS.filter((i) => i.sector !== 'index');
 const TABS = ['SPX', ...TRADABLE.map((i) => i.id)];
@@ -46,6 +49,7 @@ export function App() {
   const [identity, setIdentity] = useState<Identity>('retail');
   const [, forceRender] = useState(0);
   const [selected, setSelected] = useState('LEH');
+  const [showMA, setShowMA] = useState(true);
 
   const engineRef = useRef<GameEngine | null>(null);
   const tickRef = useRef(0);
@@ -130,6 +134,9 @@ export function App() {
     [engine, selected, tickRef.current],
   );
 
+  // 行情统计（现价、区间高低、均线、波动率……）——同样只基于可见 K 线
+  const quote = useMemo(() => computeQuote(bars), [bars]);
+
   // 净值曲线与「标普买入持有」基准。
   // 基准按初始资金归一化，两条线才能放在同一尺度上比较。
   const equityCurve = useMemo(
@@ -147,6 +154,26 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, tickRef.current]);
 
+  // 所有按钮的悬浮说明。useTip 是 hook，必须在任何条件返回之前调用。
+  const startTip = useTip(
+    '开始\n\n用当前选择的种子、难度和身份开始一局。\n\n同一个种子会生成完全相同的市场与事件时点，' +
+      '所以你可以用同一个种子对比不同策略，也可以把种子告诉别人来比成绩。',
+  );
+  const buy25Tip = useTip(BUTTON_TIPS.buy25);
+  const buy100Tip = useTip(BUTTON_TIPS.buy100);
+  const sell25Tip = useTip(BUTTON_TIPS.sell25);
+  const sell100Tip = useTip(BUTTON_TIPS.sell100);
+  const flattenTip = useTip(BUTTON_TIPS.flatten);
+  const advance1Tip = useTip(BUTTON_TIPS.advance1);
+  const advanceEventTip = useTip(BUTTON_TIPS.advanceEvent);
+  const advanceMonthTip = useTip(BUTTON_TIPS.advanceMonth);
+  const restartTip = useTip(BUTTON_TIPS.restart);
+  const maTip = useTip(
+    '均线开关\n\n切换 K 线上的 MA20（橙）与 MA60（棕）移动平均线。\n\n' +
+      '均线是用来看趋势的：价格在均线上方通常是上升趋势，下方是下降趋势。\n\n' +
+      '危机里均线会变成压力位——每次反弹到均线附近就掉头向下。',
+  );
+
   // ------------------------------------------------------------ 开始界面
 
   if (!started) {
@@ -160,7 +187,9 @@ export function App() {
         </p>
         <div style={{ marginTop: 26 }}>
           <label>
-            <span>随机种子（同一个种子 = 同一场危机）</span>
+            <span>
+              <Tip text={BUTTON_TIPS.seed}>随机种子 ⓘ</Tip>（同一个种子 = 同一场危机）
+            </span>
             <input
               type="number"
               value={seed}
@@ -169,7 +198,9 @@ export function App() {
             />
           </label>
           <label>
-            <span>难度</span>
+            <span>
+              <Tip text={BUTTON_TIPS.difficulty}>难度 ⓘ</Tip>
+            </span>
             <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value) as Difficulty)}>
               {([0, 1, 2, 3] as Difficulty[]).map((d) => (
                 <option key={d} value={d}>
@@ -179,7 +210,9 @@ export function App() {
             </select>
           </label>
           <label>
-            <span>身份</span>
+            <span>
+              <Tip text={BUTTON_TIPS.identity}>身份 ⓘ</Tip>
+            </span>
             <select value={identity} onChange={(e) => setIdentity(e.target.value as Identity)}>
               {(Object.keys(IDENTITY_LABEL) as Identity[]).map((k) => (
                 <option key={k} value={k}>
@@ -190,6 +223,7 @@ export function App() {
           </label>
           <button
             className="primary"
+            {...startTip}
             onClick={() => {
               createEngine({ seed, difficulty, identity });
               setStarted(true);
@@ -198,7 +232,17 @@ export function App() {
             开始
           </button>
         </div>
-        <p style={{ marginTop: 26, fontSize: 11 }}>
+        {difficulty <= 1 && (
+          <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
+            <b>新手建议先选 D0 或 D1。</b>
+            {'\n\n'}
+            低难度不是「信息更少」，而是**同样的信息讲得更清楚**——
+            游戏里会把每个数字是什么意思、什么水平算危险都写给你。
+            {'\n\n'}
+            进游戏后，把鼠标停在任意按钮或指标名上，都会弹出说明。
+          </div>
+        )}
+        <p style={{ marginTop: 22, fontSize: 11 }}>
           已载入 {dataset.events.length} 张事件卡 · {dataset.institutions.institutions.length} 家机构 ·{' '}
           {dataset.rumors.templates.length} 类传闻
         </p>
@@ -216,6 +260,18 @@ export function App() {
   const relVsBench = benchNow > 0 ? s.equity / benchNow - 1 : 0;
   const news = [...engine.state.news].reverse().slice(0, 40);
   const lateEvents = engine.state.firedEvents.slice(-3);
+
+  // 情境提示：低难度给更多、更直白的引导
+  const hints = buildHints(engine);
+
+  // 难度门控 —— 与 docs/01 §4.2 的难度矩阵保持一致：
+  //   D0 只有 K 线 / 成交量 / 新闻标题
+  //   D1 加上宏观指标（信用利差 / TED / VIX / 流动性）
+  //   D2+ 加上融资机制（回购折扣率 / 融资容量 / 展期率）
+  //   D2+ 才显示监管足迹（小资金玩家的 SRS 永远接近 0，机制不激活）
+  const showMacro = engine.config.difficulty >= 1;
+  const showFunding = engine.config.difficulty >= 2 || engine.config.identity !== 'retail';
+  const showRegulator = engine.config.difficulty >= 2 || engine.config.identity !== 'retail';
 
   return (
     <div className="app">
@@ -238,26 +294,33 @@ export function App() {
           <span className="v">{money(s.cash)}</span>
         </div>
         <div className="stat">
-          <span className="k">最大回撤</span>
+          <span className="k">
+            <Tip text={GLOSSARY.maxDrawdown.detail}>最大回撤 ⓘ</Tip>
+          </span>
           <span className="v warn">{pct(s.maxDrawdown)}</span>
         </div>
         <div className="stat">
-          <span className="k">标普 / VIX</span>
+          <span className="k">
+            <Tip text={`${GLOSSARY.spx.plain}\n\n${GLOSSARY.vix.plain}\n\n${GLOSSARY.vix.detail}`}>
+              标普 / VIX ⓘ
+            </Tip>
+          </span>
           <span className="v">
             {m.spx.toFixed(0)} / {m.vix.toFixed(1)}
           </span>
         </div>
         <span className="spacer" />
-        <button onClick={() => advanceDays(1)} disabled={engine.isOver}>
+        <button onClick={() => advanceDays(1)} disabled={engine.isOver} {...advance1Tip}>
           推进 1 天
         </button>
-        <button onClick={() => proceed(1, true)} disabled={engine.isOver}>
+        <button onClick={() => proceed(1, true)} disabled={engine.isOver} {...advanceEventTip}>
           快进到事件
         </button>
-        <button onClick={() => proceed(21, false)} disabled={engine.isOver}>
+        <button onClick={() => proceed(21, false)} disabled={engine.isOver} {...advanceMonthTip}>
           快进 1 个月
         </button>
         <button
+          {...restartTip}
           onClick={() => {
             setStarted(false);
             engineRef.current = null;
@@ -276,11 +339,38 @@ export function App() {
                 {id}
               </button>
             ))}
+            <span className="spacer" style={{ flex: 1 }} />
+            <button
+              className={showMA ? 'active' : ''}
+              onClick={() => setShowMA((v) => !v)}
+              {...maTip}
+            >
+              {showMA ? '均线 开' : '均线 关'}
+            </button>
           </div>
-          <KLineChart bars={bars} instrumentId={selected} />
+          <KLineChart bars={bars} instrumentId={selected} showMA={showMA} />
+
+          {quote && (
+            <div className="panel" style={{ marginTop: 10 }}>
+              <h3>
+                <Tip
+                  text={
+                    '行情数据\n\n' +
+                    '全部来自「今天及以前」的 K 线，不包含未来信息。\n\n' +
+                    '把鼠标停在任意一行上会解释它的含义与危险水平。'
+                  }
+                >
+                  行情数据 ⓘ
+                </Tip>
+              </h3>
+              <QuotePanel stats={quote} instrumentId={selected} />
+            </div>
+          )}
 
           <div className="panel" style={{ marginTop: 10 }}>
-            <h3>净值曲线</h3>
+            <h3>
+              <Tip text={`${GLOSSARY.spx.plain}\n\n${GLOSSARY.spx.detail}`}>净值曲线 ⓘ</Tip>
+            </h3>
             <div className="curve-legend">
               <span>
                 <i className="dot-eq" />
@@ -305,25 +395,27 @@ export function App() {
           <div className="panel" style={{ marginTop: 10 }}>
             <h3>下单 · {selected}</h3>
             <div className="actions">
-              <button className="buy" onClick={() => order('buy', 0.25)} disabled={engine.isOver}>
+              <button className="buy" onClick={() => order('buy', 0.25)} disabled={engine.isOver} {...buy25Tip}>
                 做多 25%
               </button>
-              <button className="buy" onClick={() => order('buy', 1.0)} disabled={engine.isOver}>
+              <button className="buy" onClick={() => order('buy', 1.0)} disabled={engine.isOver} {...buy100Tip}>
                 做多 100%
               </button>
-              <button className="sell" onClick={() => order('sell', 0.25)} disabled={engine.isOver}>
+              <button className="sell" onClick={() => order('sell', 0.25)} disabled={engine.isOver} {...sell25Tip}>
                 做空 25%
               </button>
-              <button className="sell" onClick={() => order('sell', 1.0)} disabled={engine.isOver}>
+              <button className="sell" onClick={() => order('sell', 1.0)} disabled={engine.isOver} {...sell100Tip}>
                 做空 100%
               </button>
-              <button onClick={flatten} disabled={engine.isOver}>
+              <button onClick={flatten} disabled={engine.isOver} {...flattenTip}>
                 清仓全部
               </button>
             </div>
             <div className="dim" style={{ marginTop: 7, fontSize: 11 }}>
-              挂单 {engine.state.pendingOrders.length} 笔 · 以次日开盘价成交，含滑点。
-              订单提交后不可撤销。
+              <Tip text={GLOSSARY.pendingOrders.detail}>
+                挂单 {engine.state.pendingOrders.length} 笔 ⓘ
+              </Tip>{' '}
+              · 以次日开盘价成交，含滑点。订单提交后不可撤销。
             </div>
           </div>
         </div>
@@ -347,6 +439,12 @@ export function App() {
               <b>2009 年结束了。</b> 你活了下来。
             </div>
           )}
+
+          {hints.map((h, i) => (
+            <div key={i} className={`hint ${h.level}`}>
+              {h.text}
+            </div>
+          ))}
 
           <div className="panel">
             <h3>新闻流</h3>
@@ -407,68 +505,167 @@ export function App() {
 
           <div className="panel">
             <h3>市场</h3>
-            <div className="bar-row">
-              <span className="k">系统性压力</span>
-              <span>{pct(m.systemicStress)}</span>
-            </div>
-            <div className="bar-row">
-              <span className="k">信用利差</span>
-              <span>{m.creditSpread.toFixed(0)} bp</span>
-            </div>
-            <div className="bar-row">
-              <span className="k">TED 利差</span>
-              <span>{m.tedSpread.toFixed(2)}%</span>
-            </div>
-            <div className="bar-row">
-              <span className="k">市场流动性</span>
-              <span className={m.liquidity < 0.3 ? 'neg' : ''}>{pct(m.liquidity)}</span>
-            </div>
-            {(engine.config.difficulty >= 2 || engine.config.identity !== 'retail') && (
+            {!showMacro && (
+              <div className="locked-note">
+                <b>D0 不显示宏观指标——这是刻意的。</b>
+                {'\n\n'}
+                你只有 K 线、成交量和新闻标题。
+                {'\n\n'}
+                你以为你缺的是数据，但 2008 年的专业机构拿着这些数据，也一样没跑掉。
+                低难度的课题不是「看到更多」，而是**从新闻里读出方向**。
+                {'\n\n'}
+                想要指标？下一局选 D1 或更高。
+              </div>
+            )}
+            {showMacro && (
               <>
                 <div className="bar-row">
-                  <span className="k">回购折扣率</span>
-                  <span className={m.repoHaircut > 0.3 ? 'neg' : ''}>{pct(m.repoHaircut)}</span>
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.systemicStress.plain}\n\n${GLOSSARY.systemicStress.detail}`}>
+                      系统性压力 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={m.systemicStress > 0.5 ? 'neg' : m.systemicStress > 0.3 ? 'warn' : ''}>
+                    {pct(m.systemicStress)}
+                  </span>
                 </div>
                 <div className="bar-row">
-                  <span className="k">融资容量</span>
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.creditSpread.plain}\n\n${GLOSSARY.creditSpread.detail}`}>
+                      信用利差 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={m.creditSpread > 800 ? 'neg' : m.creditSpread > 450 ? 'warn' : ''}>
+                    {m.creditSpread.toFixed(0)} bp
+                  </span>
+                </div>
+                <div className="bar-row">
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.tedSpread.plain}\n\n${GLOSSARY.tedSpread.detail}`}>
+                      TED 利差 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={m.tedSpread > 2 ? 'neg' : m.tedSpread > 1 ? 'warn' : ''}>
+                    {m.tedSpread.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="bar-row">
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.liquidity.plain}\n\n${GLOSSARY.liquidity.detail}`}>
+                      市场流动性 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={m.liquidity < 0.3 ? 'neg' : m.liquidity < 0.6 ? 'warn' : ''}>
+                    {pct(m.liquidity)}
+                  </span>
+                </div>
+              </>
+            )}
+            {showMacro && showFunding && (
+              <>
+                <div className="bar-row">
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.repoHaircut.plain}\n\n${GLOSSARY.repoHaircut.detail}`}>
+                      回购折扣率 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={m.repoHaircut > 0.3 ? 'neg' : m.repoHaircut > 0.15 ? 'warn' : ''}>
+                    {pct(m.repoHaircut)}
+                  </span>
+                </div>
+                <div className="bar-row">
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.repoCapacity.plain}\n\n${GLOSSARY.repoCapacity.detail}`}>
+                      融资容量 ⓘ
+                    </Tip>
+                  </span>
                   <span>{money(engine.state.player.repoCapacity)}</span>
                 </div>
                 <div className="bar-row">
-                  <span className="k">预计展期率</span>
-                  <span>{pct(engine.state.player.repoRolloverRate)}</span>
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.rolloverRate.plain}\n\n${GLOSSARY.rolloverRate.detail}`}>
+                      预计展期率 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={engine.state.player.repoRolloverRate < 0.6 ? 'neg' : ''}>
+                    {pct(engine.state.player.repoRolloverRate)}
+                  </span>
                 </div>
               </>
             )}
           </div>
 
           <div className="panel">
-            <h3>你的系统性足迹</h3>
-            <div className="bar-row">
-              <span className="k">空头集中度</span>
-              <span className={engine.state.regulator.shortConcentration > 0.04 ? 'warn' : ''}>
-                {pct(engine.state.regulator.shortConcentration)}（5% 触发披露）
-              </span>
-            </div>
-            <div className="bar-row">
-              <span className="k">SRS</span>
-              <span>{engine.state.regulator.srs.toFixed(3)}</span>
-            </div>
-            <div className="bar-row">
-              <span className="k">监管关注度</span>
-              <span className={s.regulatorLevel >= 2 ? 'warn' : 'dim'}>
-                L{s.regulatorLevel} {LEVEL_LABEL[s.regulatorLevel]}
-              </span>
-            </div>
-            {engine.state.regulator.rules.length > 0 && (
-              <div className="dim" style={{ marginTop: 6, fontSize: 11 }}>
-                生效规则：
-                {engine.state.regulator.rules.map((r) => `${r.kind}(${r.scope.join('/')} 至 ${r.effectiveTo})`).join('、')}
+            <h3>
+              <Tip text={`${GLOSSARY.srs.plain}\n\n${GLOSSARY.srs.detail}`}>你的系统性足迹 ⓘ</Tip>
+            </h3>
+            {!showRegulator ? (
+              <div className="locked-note">
+                监管机制要到 D2 才会激活。
+                {'\n\n'}
+                原因很简单：小资金玩家的仓位小到不会影响市场，
+                SRS 永远接近 0，监管根本不会注意到你。
+                {'\n\n'}
+                **你想被监管盯上，先得大到「不能不管」。**
               </div>
+            ) : (
+              <>
+                <div className="bar-row">
+                  <span className="k">
+                    <Tip
+                      text={`${GLOSSARY.shortConcentration.plain}\n\n${GLOSSARY.shortConcentration.detail}`}
+                    >
+                      空头集中度 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={engine.state.regulator.shortConcentration > 0.04 ? 'warn' : ''}>
+                    {pct(engine.state.regulator.shortConcentration)}（5% 触发披露）
+                  </span>
+                </div>
+                <div className="bar-row">
+                  <span className="k">
+                    <Tip text={GLOSSARY.srs.detail}>SRS ⓘ</Tip>
+                  </span>
+                  <span className={engine.state.regulator.srs > 0.5 ? 'neg' : engine.state.regulator.srs > 0.2 ? 'warn' : ''}>
+                    {engine.state.regulator.srs.toFixed(3)}
+                  </span>
+                </div>
+                <div className="bar-row">
+                  <span className="k">
+                    <Tip text={`${GLOSSARY.regulatorLevel.plain}\n\n${GLOSSARY.regulatorLevel.detail}`}>
+                      监管关注度 ⓘ
+                    </Tip>
+                  </span>
+                  <span className={s.regulatorLevel >= 2 ? 'warn' : 'dim'}>
+                    L{s.regulatorLevel} {LEVEL_LABEL[s.regulatorLevel]}
+                  </span>
+                </div>
+                {engine.state.regulator.rules.length > 0 && (
+                  <div className="dim" style={{ marginTop: 6, fontSize: 11 }}>
+                    生效规则：
+                    {engine.state.regulator.rules
+                      .map((r) => `${r.kind}(${r.scope.join('/')} 至 ${r.effectiveTo})`)
+                      .join('、')}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <div className="panel">
-            <h3>机构状态</h3>
+            <h3>
+              <Tip
+                text={
+                  '机构脆弱度\n\n' +
+                  '由杠杆、回购融资依赖度、资产受损程度、市场信心、对手方敞口和资本缓冲合成。\n\n' +
+                  '**先倒下的，是脆弱度最高的那一个——而不是随机被选中的。**\n\n' +
+                  '这也是本作的核心设计：随机性作用于「谁先撑不住」，而不是「凭空指定谁先死」。' +
+                  '所以你可以通过观察哪些机构在恶化来预判，只是预判不会 100% 准确。'
+                }
+              >
+                机构状态 ⓘ
+              </Tip>
+            </h3>
             <table>
               <tbody>
                 {engine
