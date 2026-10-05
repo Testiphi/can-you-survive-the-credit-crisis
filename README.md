@@ -1,8 +1,13 @@
 # 你能不能逃过信贷危机
 
+[![CI](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/ci.yml/badge.svg)](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/deploy-pages.yml)
+
 > 一个以 2007–2009 年全球信贷危机为舞台的单人回合制交易模拟游戏。
 
-**当前状态：设计阶段。仓库内只有设计文档，还没有代码。**
+**在线试玩**：https://testiphi.github.io/can-you-survive-the-credit-crisis/
+
+**当前状态：引擎 + P0 原型可玩。** 90 张事件卡、47 个测试全绿，前端可构建部署。
 
 ---
 
@@ -80,6 +85,25 @@ pnpm --filter @cyscc/web dev        # 开发服务器
 pnpm --filter @cyscc/web build      # 生产构建 → apps/web/dist
 pnpm --filter @cyscc/web preview    # 预览构建产物
 ```
+
+### 部署到 GitHub Pages
+
+推送到 `main` 后由 [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) 自动构建并发布。
+
+**首次启用需要手动做一次**：仓库 `Settings → Pages → Build and deployment → Source` 选择 **GitHub Actions**。
+之后每次推送都会自动重新部署。
+
+站点地址：`https://<用户名>.github.io/<仓库名>/`
+
+> ⚠️ **项目页面的地址带仓库名前缀**，所以构建时必须设置 Vite 的 `base`，
+> 否则 `/assets/index-xxx.js` 这类绝对路径会全部 404。
+> 本仓库通过 `VITE_BASE_PATH` 环境变量注入（本地开发回落到 `/`，不受影响）：
+
+```bash
+VITE_BASE_PATH=/can-you-survive-the-credit-crisis/ pnpm --filter @cyscc/web build
+```
+
+部署流水线会在发布前跑引擎测试、事件卡校验与价格量级检查——**引擎不过关就不上线**。
 
 ## 数据与工具
 
