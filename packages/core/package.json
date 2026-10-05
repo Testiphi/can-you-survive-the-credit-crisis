@@ -1,0 +1,14 @@
+{
+  "name": "@cyscc/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "零依赖的模拟引擎。可在 Node 中直接运行（原生 TypeScript 类型擦除），也可被浏览器打包。",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.ts\""
+  }
+}

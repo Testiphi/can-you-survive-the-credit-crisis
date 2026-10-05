@@ -1,0 +1,862 @@
+{
+  "version": 1,
+  "subsystem": "repo",
+  "note": "回购市场与融资机制事件卡。tier=funding。这些事件大多不直接冲击股价，而是冲击【融资能力】——这正是 2008 年真正的杀伤路径。多数卡在 D2 才可见。impact 数值为设计校准值。",
+  "designNote": "本文件的卡构成一条独立弧线：haircut 阶跃 → 期限缩短 → 出借方撤退 → 挤兑 → 火售螺旋 → 恢复。它们是 docs/07 的数值模型的触发器。D0 玩家看不到这条弧线，这正是难度的自然梯度来源。",
+  "events": [
+    {
+      "id": "repo_haircut_first_ratchet",
+      "phase": 1,
+      "date": "2007-08-15",
+      "title": "结构化产品回购折扣率第一次跳升",
+      "headline": "私有标签 RMBS 回购折扣率从 5% 跳升至 15%，交易商融资能力一夜收缩",
+      "narrative": "巴黎银行冻结基金之后，回购出借方开始重新评估抵押品。\n\n**同一批资产，能借到的钱少了 10%。** 没有人报道这件事，也没有任何指数反映它——但它是接下来两年里杀死每一家投行的东西。",
+      "window": [
+        "2007-08-10",
+        "2007-10-15"
+      ],
+      "requires": [
+        "bnp_paribas_freeze"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": -0.01,
+        "indexReturn": -0.005,
+        "volMultiplier": 1.15,
+        "creditSpreadDelta": 40,
+        "liquidityMultiplier": 0.75,
+        "repoHaircutDelta": 0.1,
+        "decayDays": 120
+      },
+      "affectsFragility": {
+        "all_financials": 0.08,
+        "BSC": 0.08,
+        "LEH": 0.07,
+        "NRK": 0.12
+      },
+      "unlocks": [
+        "repo_maturity_shortening"
+      ],
+      "newsVisibility": 2,
+      "sources": [
+        "Gorton & Metrick",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "repo_maturity_shortening",
+      "phase": 1,
+      "date": "2007-09-10",
+      "title": "回购期限从三个月缩短到隔夜",
+      "headline": "交易商的回购融资期限结构急剧短期化，隔夜占比从 35% 升至 70%",
+      "narrative": "这是整场危机里**最重要的一个预警信号**，也是最不被注意的一个。\n\n隔夜融资意味着：对手方每天早上都可以选择不再借钱给你。**期限越短，「挤兑」发生得越快。**",
+      "window": [
+        "2007-09-01",
+        "2007-12-15"
+      ],
+      "requires": [
+        "repo_haircut_first_ratchet"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.004,
+        "volMultiplier": 1.2,
+        "creditSpreadDelta": 45,
+        "liquidityMultiplier": 0.68,
+        "repoHaircutDelta": 0.05,
+        "rolloverRateDelta": -0.2,
+        "decayDays": 150
+      },
+      "affectsFragility": {
+        "all_financials": 0.08,
+        "BSC": 0.12,
+        "LEH": 0.1,
+        "MER": 0.06
+      },
+      "unlocks": [
+        "repo_lender_exodus_begins"
+      ],
+      "newsVisibility": 2,
+      "designNote": "本卡不改变价格，只改变【期限】。它的效果是让后续所有挤兑事件发生得更快——这是本作唯一通过修改机制参数而非价格来施加影响的事件类型。",
+      "sources": [
+        "Gorton & Metrick"
+      ]
+    },
+    {
+      "id": "repo_lender_exodus_begins",
+      "phase": 1,
+      "date": "2007-11-15",
+      "title": "货币基金开始撤出结构化抵押品回购",
+      "headline": "多家大型货币市场基金内部限制对非国债抵押品的回购出借",
+      "narrative": "出借方不是交易员，是**风险委员会**。它们一旦决定撤退，速度是小时级的，而且不会因为价格便宜而回来。\n\n**这是「流动性提供者没有义务留在市场里」的第一课。**",
+      "window": [
+        "2007-10-15",
+        "2008-02-15"
+      ],
+      "requires": [
+        "repo_maturity_shortening"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.006,
+        "volMultiplier": 1.25,
+        "creditSpreadDelta": 55,
+        "liquidityMultiplier": 0.6,
+        "repoHaircutDelta": 0.06,
+        "rolloverRateDelta": -0.15,
+        "decayDays": 150
+      },
+      "affectsFragility": {
+        "all_financials": 0.1,
+        "BSC": 0.14,
+        "LEH": 0.1,
+        "MER": 0.08,
+        "C": 0.06
+      },
+      "unlocks": [
+        "repo_bear_run"
+      ],
+      "newsVisibility": 2,
+      "sources": [
+        "FCIC Report",
+        "ICI"
+      ]
+    },
+    {
+      "id": "repo_bear_run",
+      "phase": 2,
+      "date": "2008-03-13",
+      "title": "贝尔斯登回购融资两天内被抽走 170 亿美元",
+      "headline": "回购出借方集体拒绝为贝尔斯登展期，公司流动性将于次日耗尽",
+      "narrative": "不是因为它亏损——它当时资本充足率达标。是因为**没有人愿意在明天继续借钱给它。**\n\n富达、先锋等大型货币基金直接停止对贝尔斯登出借。它账上有 3950 亿美元资产，但借不到明天的钱。\n\n**这就是「融不到资」的全部含义。**",
+      "window": [
+        "2008-03-05",
+        "2008-03-20"
+      ],
+      "requires": [
+        "repo_funding_stress",
+        "repo_lender_exodus_begins"
+      ],
+      "requireAnyOf": [
+        [
+          "carlyle_capital_default"
+        ]
+      ],
+      "trigger": {
+        "type": "competing_risk",
+        "institution": "BSC",
+        "baseHazard": 0.06,
+        "note": "与 bear_stearns_liquidity_crisis 构成同一事件的两个视角：本卡从资金面，那张卡从公司面。"
+      },
+      "tier": "funding",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "BSC",
+          "financials"
+        ],
+        "equityReturn": -0.35,
+        "indexReturn": -0.01,
+        "volMultiplier": 1.5,
+        "creditSpreadDelta": 120,
+        "liquidityMultiplier": 0.42,
+        "repoHaircutDelta": 0.12,
+        "rolloverRateDelta": -0.55,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "BSC": 0.22,
+        "LEH": 0.14,
+        "MER": 0.1,
+        "GS": 0.06,
+        "MS": 0.06,
+        "all_financials": 0.1
+      },
+      "unlocks": [
+        "bear_stearns_collapse",
+        "repo_triparty_concentration"
+      ],
+      "newsVisibility": 1,
+      "sources": [
+        "FCIC Report",
+        "SEC 文件"
+      ]
+    },
+    {
+      "id": "repo_triparty_concentration",
+      "phase": 2,
+      "date": "2008-03-20",
+      "title": "三方回购市场的单点故障暴露",
+      "headline": "2.8 万亿美元三方回购市场仅由两家清算银行处理，日间授信成为系统性隐患",
+      "narrative": "整个市场的运转依赖两家银行的日间授信。如果它们中的任何一家收紧，回购市场会在一天之内停摆。\n\n**这是整个金融体系里最集中的单点故障**，而在 2008 年 3 月之前，几乎没有人讨论过它。",
+      "window": [
+        "2008-03-16",
+        "2008-06-15"
+      ],
+      "requires": [
+        "repo_bear_run"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": -0.01,
+        "indexReturn": -0.004,
+        "volMultiplier": 1.15,
+        "creditSpreadDelta": 35,
+        "liquidityMultiplier": 0.7,
+        "repoHaircutDelta": 0.04,
+        "rolloverRateDelta": -0.1,
+        "decayDays": 60
+      },
+      "affectsFragility": {
+        "all_financials": 0.05,
+        "JPM": 0.04
+      },
+      "unlocks": [],
+      "newsVisibility": 2,
+      "sources": [
+        "纽约联储",
+        "Gorton & Metrick"
+      ]
+    },
+    {
+      "id": "repo_haircut_second_ratchet",
+      "phase": 2,
+      "date": "2008-06-16",
+      "title": "回购折扣率第二次跳升",
+      "headline": "结构化产品回购折扣率升至 30%，机构被迫在劣质价格上出售资产",
+      "narrative": "贝尔斯登被收购后，出借方对**所有**交易商重新定价。\n\n每一次 haircut 跳升，都意味着一批机构必须立刻卖出资产来填补融资缺口——**而它们的卖出又压低了价格，让 haircut 继续上升。**",
+      "window": [
+        "2008-05-15",
+        "2008-08-31"
+      ],
+      "requires": [
+        "repo_triparty_concentration"
+      ],
+      "requireAnyOf": [
+        [
+          "lehman_contagion"
+        ],
+        [
+          "false_calm_summer2008"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials",
+          "SPX"
+        ],
+        "equityReturn": -0.04,
+        "indexReturn": -0.012,
+        "volMultiplier": 1.35,
+        "creditSpreadDelta": 90,
+        "liquidityMultiplier": 0.55,
+        "repoHaircutDelta": 0.12,
+        "rolloverRateDelta": -0.18,
+        "decayDays": 90
+      },
+      "affectsFragility": {
+        "all_financials": 0.12,
+        "LEH": 0.14,
+        "MER": 0.1,
+        "FNM": 0.1,
+        "FRE": 0.1,
+        "AIG": 0.1
+      },
+      "unlocks": [
+        "repo_lehman_run"
+      ],
+      "newsVisibility": 2,
+      "sources": [
+        "Gorton & Metrick"
+      ]
+    },
+    {
+      "id": "repo_lehman_run",
+      "phase": 3,
+      "date": "2008-09-11",
+      "title": "雷曼回购融资被撤",
+      "headline": "雷曼约 2000 亿美元回购融资遭遇大规模拒绝展期，现金缓冲数日内耗尽",
+      "narrative": "与贝尔斯登完全相同的剧本，只是规模大了一倍。\n\n**注意：雷曼倒下时账面净资产仍为正。** 它不是资不抵债而死的，是借不到钱而死的。\n\n玩家如果在这一刻想到「雷曼肯定要破产，我要做空」——这是对的。但真正的问题是：**你能不能借到券去做空？**",
+      "window": [
+        "2008-09-05",
+        "2008-09-14"
+      ],
+      "requires": [
+        "repo_haircut_second_ratchet",
+        "lehman_stock_collapse"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "competing_risk",
+        "institution": "LEH",
+        "baseHazard": 0.1
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "LEH",
+          "financials"
+        ],
+        "equityReturn": -0.3,
+        "indexReturn": -0.03,
+        "volMultiplier": 1.6,
+        "creditSpreadDelta": 200,
+        "liquidityMultiplier": 0.35,
+        "repoHaircutDelta": 0.15,
+        "rolloverRateDelta": -0.6,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "LEH": 0.25,
+        "AIG": 0.18,
+        "MER": 0.14,
+        "GS": 0.1,
+        "MS": 0.1,
+        "all_financials": 0.14
+      },
+      "unlocks": [
+        "repo_haircut_third_ratchet"
+      ],
+      "newsVisibility": 1,
+      "sources": [
+        "Valukas 报告",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "aig_securities_lending_run",
+      "phase": 3,
+      "date": "2008-09-16",
+      "title": "AIG 证券借贷项目遭遇挤兑",
+      "headline": "AIG 750 亿美元证券借贷项目遭对手方集中撤资，借入现金已投入 MBS 无法回收",
+      "narrative": "AIG 把借来的证券换成现金，再把现金投进 MBS。当证券借贷的对手方要求归还证券时，**AIG 拿不出流动性来赎回自己投出去的现金。**\n\n这是一个**伪装成保险业务的回购挤兑**。它比 CDS 亏损更早、更快地杀死了 AIG。\n\n**这一课：同一个风险可以从多个完全不同的入口攻击你。**",
+      "window": [
+        "2008-09-14",
+        "2008-09-22"
+      ],
+      "requires": [
+        "repo_lehman_run"
+      ],
+      "requireAnyOf": [
+        [
+          "lehman_collapse"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.5
+      },
+      "tier": "funding",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "AIG",
+          "financials"
+        ],
+        "equityReturn": -0.45,
+        "indexReturn": -0.015,
+        "volMultiplier": 1.5,
+        "creditSpreadDelta": 240,
+        "liquidityMultiplier": 0.25,
+        "repoHaircutDelta": 0.15,
+        "rolloverRateDelta": -0.4,
+        "decayDays": 25
+      },
+      "affectsFragility": {
+        "AIG": 0.3,
+        "all_financials": 0.12
+      },
+      "unlocks": [
+        "repo_haircut_third_ratchet"
+      ],
+      "newsVisibility": 2,
+      "designNote": "本卡与 aig_bailout 是同一事件的不同入口。若两者都触发，AIG 的脆弱度惩罚叠加——这是刻意的，因为 AIG 确实同时死于 CDS 和证券借贷两条线。",
+      "sources": [
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "repo_haircut_third_ratchet",
+      "phase": 3,
+      "date": "2008-09-16",
+      "title": "回购折扣率第三次跳升：结构化产品彻底无法融资",
+      "headline": "结构化产品回购折扣率升至 45%，部分品种达到 100%——完全无法用于融资",
+      "narrative": "这是整个回购市场历史上最剧烈的一次重定价。\n\n**haircut 100% 的意思是：这个资产不能再用来借钱，它的融资价值是零。**\n\n对于依赖它融资的机构而言，这等价于资产被瞬间冻结——你名义上还拥有它，但它不能给你带来一分钱流动性。",
+      "window": [
+        "2008-09-14",
+        "2008-10-01"
+      ],
+      "requires": [
+        "repo_lehman_run"
+      ],
+      "requireAnyOf": [
+        [
+          "repo_haircut_second_ratchet"
+        ]
+      ],
+      "trigger": {
+        "type": "state",
+        "predicate": "systemicStress > 0.7"
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials",
+          "SPX"
+        ],
+        "equityReturn": -0.06,
+        "indexReturn": -0.025,
+        "volMultiplier": 1.5,
+        "creditSpreadDelta": 260,
+        "liquidityMultiplier": 0.18,
+        "repoHaircutDelta": 0.3,
+        "rolloverRateDelta": -0.35,
+        "decayDays": 120
+      },
+      "affectsFragility": {
+        "all_financials": 0.18,
+        "MER": 0.15,
+        "GS": 0.12,
+        "MS": 0.14,
+        "C": 0.12,
+        "AIG": 0.12
+      },
+      "unlocks": [
+        "repo_triparty_freeze",
+        "repo_fire_sale_spiral"
+      ],
+      "newsVisibility": 2,
+      "structural": true,
+      "sources": [
+        "Gorton & Metrick",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "repo_triparty_freeze",
+      "phase": 3,
+      "date": "2008-09-18",
+      "title": "三方回购市场冻结，美联储首次接受股票作为抵押品",
+      "headline": "三方回购市场近乎停摆，美联储扩大 PDCF 抵押品范围至普通股",
+      "narrative": "连隔夜融资都做不成了。清算银行收紧日间授信，整个 2.8 万亿市场濒临停摆。\n\n美联储的反应是史无前例的：**接受股票作为抵押品。** 央行直接变成了回购市场的对手方。\n\n**这是央行角色的根本转变：从最后贷款人，变成最后的回购交易商。**",
+      "window": [
+        "2008-09-17",
+        "2008-10-05"
+      ],
+      "requires": [
+        "repo_haircut_third_ratchet"
+      ],
+      "requireAnyOf": [
+        [
+          "money_market_run"
+        ],
+        [
+          "counterparty_crisis"
+        ]
+      ],
+      "trigger": {
+        "type": "state",
+        "predicate": "liquidityMultiplier < 0.3"
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.03,
+        "indexReturn": -0.02,
+        "volMultiplier": 1.45,
+        "creditSpreadDelta": 180,
+        "liquidityMultiplier": 0.2,
+        "repoHaircutDelta": 0.08,
+        "rolloverRateDelta": 0.25,
+        "decayDays": 40
+      },
+      "affectsFragility": {
+        "all_financials": 0.08,
+        "GS": 0.08,
+        "MS": 0.1
+      },
+      "unlocks": [
+        "repo_money_fund_exodus",
+        "cpff_announced"
+      ],
+      "newsVisibility": 2,
+      "designNote": "注意 rolloverRateDelta 是正的：美联储的介入实际【改善】了展期率。政策事件不总是坏消息——这一点在 D2 及以上难度尤其重要，玩家需要学会区分「机制恶化」和「机制被托底」。",
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "repo_money_fund_exodus",
+      "phase": 3,
+      "date": "2008-09-19",
+      "title": "货币基金撤出回购市场",
+      "headline": "货币基金一周撤出 3000 亿美元，回购市场最大资金来源消失；财政部宣布担保计划",
+      "narrative": "回购市场最大的出借方就是货币基金。当它们自身遭遇挤兑时，它们唯一能做的就是**停止出借并回收现金**。\n\n**这就是挤兑的传染机制：一个市场的挤兑，通过资金链传导成另一个市场的挤兑。**",
+      "window": [
+        "2008-09-17",
+        "2008-10-10"
+      ],
+      "requires": [
+        "repo_triparty_freeze"
+      ],
+      "requireAnyOf": [
+        [
+          "money_market_run"
+        ]
+      ],
+      "trigger": {
+        "type": "state",
+        "predicate": "liquidityMultiplier < 0.35"
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.02,
+        "indexReturn": -0.018,
+        "volMultiplier": 1.35,
+        "creditSpreadDelta": 150,
+        "liquidityMultiplier": 0.15,
+        "repoHaircutDelta": 0.1,
+        "rolloverRateDelta": -0.3,
+        "decayDays": 45
+      },
+      "affectsFragility": {
+        "all_financials": 0.12,
+        "C": 0.1,
+        "GS": 0.08,
+        "MS": 0.1
+      },
+      "unlocks": [
+        "cpff_announced"
+      ],
+      "newsVisibility": 1,
+      "sources": [
+        "ICI",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "repo_borrow_squeeze",
+      "phase": 3,
+      "date": "2008-09-22",
+      "title": "借券市场枯竭，做空成本飙升",
+      "headline": "证券借贷部门大幅收缩，金融股借券费年化升至 20% 以上，部分标的无券可借",
+      "narrative": "证券借贷部门和回购出借方是同一批机构。当它们撤退时，**做空也做不成了。**\n\n借券费从年化 0.5% 涨到 20%+，部分标的直接无券可借。更危险的是**强制回补**：出借人可以随时召回证券，空头被迫在市场上买入。\n\n**当大量空头同时被召回，价格会暴涨——这就是逼空的燃料。**",
+      "window": [
+        "2008-09-19",
+        "2008-11-15"
+      ],
+      "requires": [
+        "repo_money_fund_exodus"
+      ],
+      "requireAnyOf": [
+        [
+          "sec_short_ban"
+        ],
+        [
+          "repo_triparty_freeze"
+        ]
+      ],
+      "trigger": {
+        "type": "state",
+        "predicate": "liquidityMultiplier < 0.4"
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": 0.02,
+        "indexReturn": 0.005,
+        "volMultiplier": 1.3,
+        "creditSpreadDelta": 40,
+        "liquidityMultiplier": 0.3,
+        "repoHaircutDelta": 0.04,
+        "borrowFeeMultiplier": 8.0,
+        "shortableRestriction": true,
+        "decayDays": 90
+      },
+      "affectsFragility": {
+        "all_financials": 0.04
+      },
+      "unlocks": [],
+      "newsVisibility": 1,
+      "designNote": "本卡是对做空策略的【成本型】反制，与 sec_short_ban 的【规则型】反制形成互补。规则禁令是硬的，成本上升是软的——玩家仍可做空，但很贵。",
+      "sources": [
+        "证券借贷市场数据",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "cpff_announced",
+      "phase": 4,
+      "date": "2008-10-07",
+      "title": "商业票据融资工具（CPFF）设立",
+      "headline": "美联储设立 CPFF，直接向企业购买商业票据，规模无上限",
+      "narrative": "企业短期融资市场也停了。美联储直接下场成为商业票据的买家——**这一次是给非金融企业提供融资。**\n\n这是政策工具的又一次边界扩张：从银行，到交易商，到货币基金，现在到企业。",
+      "window": [
+        "2008-10-01",
+        "2008-11-15"
+      ],
+      "requires": [
+        "repo_money_fund_exodus"
+      ],
+      "requireAnyOf": [
+        [
+          "tarp_passed"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "equityReturn": 0,
+        "indexReturn": 0.008,
+        "volMultiplier": 0.88,
+        "creditSpreadDelta": -120,
+        "liquidityMultiplier": 1.35,
+        "repoHaircutDelta": -0.06,
+        "rolloverRateDelta": 0.2,
+        "decayDays": 50
+      },
+      "affectsFragility": {
+        "all_financials": -0.1
+      },
+      "unlocks": [
+        "repo_treasury_collateral_stress"
+      ],
+      "newsVisibility": 2,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "repo_fire_sale_spiral",
+      "phase": 4,
+      "date": "2008-10-10",
+      "title": "火售螺旋启动",
+      "headline": "对冲基金与交易商被迫抛售，价格下跌推高折扣率，融资缺口进一步扩大",
+      "narrative": "这是整场危机中最纯粹的一个正反馈循环：\n\n```\n被迫卖出 → 价格下跌 → 抵押品市值下降\n   → haircut 上升 → 融资缺口扩大 → 被迫卖出更多\n```\n\n**它没有自然停止点。** 唯一能让它停下来的是外部干预——政府的担保、注资、以及直接购买资产。\n\n玩家如果在这里持有杠杆多头，会亲身体验到：**你的资产没变，但你的融资能力每天都在消失。**",
+      "window": [
+        "2008-10-01",
+        "2008-11-30"
+      ],
+      "requires": [
+        "repo_haircut_third_ratchet"
+      ],
+      "requireAnyOf": [
+        [
+          "repo_money_fund_exodus"
+        ],
+        [
+          "global_meltdown_oct"
+        ]
+      ],
+      "trigger": {
+        "type": "state",
+        "predicate": "systemicStress > 0.72"
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.12,
+        "indexReturn": -0.045,
+        "volMultiplier": 1.4,
+        "creditSpreadDelta": 200,
+        "liquidityMultiplier": 0.12,
+        "repoHaircutDelta": 0.15,
+        "rolloverRateDelta": -0.25,
+        "decayDays": 60
+      },
+      "affectsFragility": {
+        "all_financials": 0.15,
+        "C": 0.12,
+        "GS": 0.1,
+        "MS": 0.12
+      },
+      "unlocks": [
+        "repo_treasury_collateral_stress"
+      ],
+      "newsVisibility": 2,
+      "structural": true,
+      "sources": [
+        "FCIC Report",
+        "Gorton & Metrick"
+      ]
+    },
+    {
+      "id": "repo_treasury_collateral_stress",
+      "phase": 4,
+      "date": "2008-10-15",
+      "title": "连国债抵押品也开始被要求更高折扣",
+      "headline": "国债回购折扣率从 1% 升至 4%，市场对一切抵押品重新定价",
+      "narrative": "这是恐慌的最深层标志。**国债是全球金融体系的终极抵押品**——当连它都被要求更高折扣时，意味着出借方已经不信任任何东西。\n\n到这一步，问题不再是「这个资产值多少钱」，而是「**还有没有东西可以用来融资**」。",
+      "window": [
+        "2008-10-10",
+        "2008-12-15"
+      ],
+      "requires": [
+        "repo_fire_sale_spiral"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "state",
+        "predicate": "systemicStress > 0.78"
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.03,
+        "volMultiplier": 1.3,
+        "creditSpreadDelta": 130,
+        "liquidityMultiplier": 0.1,
+        "repoHaircutDelta": 0.03,
+        "rolloverRateDelta": -0.15,
+        "decayDays": 45
+      },
+      "affectsFragility": {
+        "all_financials": 0.1
+      },
+      "unlocks": [],
+      "newsVisibility": 2,
+      "designNote": "这是本作的情绪最低点。技术上它只让国债 haircut 涨了 3 个百分点，但它传递的信息是「没有任何安全资产了」。UI 应该在这里给出全屏的视觉反馈。",
+      "sources": [
+        "回购市场数据"
+      ]
+    },
+    {
+      "id": "repo_normalization",
+      "phase": 5,
+      "date": "2009-06-01",
+      "title": "回购市场开始恢复",
+      "headline": "结构化产品回购折扣率回落至 15%，融资期限从隔夜恢复至一个月",
+      "narrative": "危机真正结束的标志不是股价反弹，**是融资期限变长了。**\n\n当出借方愿意再次提供一个月期的融资时，说明信任回来了。股价可以因为 QE 而上涨，但融资期限只能因为信任而恢复。\n\n**如果玩家能理解这一点，他就真正读懂了这场危机。**",
+      "window": [
+        "2009-05-01",
+        "2009-10-31"
+      ],
+      "requires": [
+        "stress_test_results"
+      ],
+      "requireAnyOf": [
+        [
+          "repo_treasury_collateral_stress"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.06
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.02,
+        "indexReturn": 0.012,
+        "volMultiplier": 0.82,
+        "creditSpreadDelta": -100,
+        "liquidityMultiplier": 1.45,
+        "repoHaircutDelta": -0.2,
+        "rolloverRateDelta": 0.3,
+        "decayDays": 90
+      },
+      "affectsFragility": {
+        "all_financials": -0.15
+      },
+      "unlocks": [],
+      "newsVisibility": 2,
+      "sources": [
+        "回购市场数据",
+        "FCIC Report"
+      ]
+    }
+  ]
+}

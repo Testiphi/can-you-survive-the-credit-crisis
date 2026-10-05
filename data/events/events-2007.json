@@ -1,0 +1,910 @@
+{
+  "version": 1,
+  "year": 2007,
+  "note": "impact 数值为设计校准值，基于历史量级估算，用于产生正确的相对冲击强度，不是精确回测输出。date 字段为历史实际日期，用于 historical 模式与参数校准。",
+  "fields": {
+    "id": "唯一标识，其他事件通过 requires/requireAnyOf/unlocks 引用",
+    "phase": "0=前奏 1=裂缝 2=贝尔斯登时刻 3=两房与雷曼 4=全面冻结 5=见底与反弹",
+    "date": "历史实际日期",
+    "window": "[最早可触发日, 最晚可触发日]，jittered 模式在此区间内浮动",
+    "requires": "硬前置，全部满足才可能触发",
+    "requireAnyOf": "软前置，满足任意一组即可",
+    "trigger": "scheduled=窗口内按概率 | competing_risk=竞争风险模型 | state=状态满足即触发",
+    "tier": "分层约束，见 docs/05",
+    "isSystemicEvent": "系统级事件，95% 以上运行中必须触发",
+    "newsVisibility": "从哪个难度开始出现：0=D0可见"
+  },
+  "events": [
+    {
+      "id": "housing_downturn",
+      "phase": 0,
+      "date": "2007-04-24",
+      "title": "美国房价见顶回落",
+      "headline": "Case-Shiller 房价指数连续第二个月下跌，为 1991 年以来首次",
+      "narrative": "全美房价在经历十年上涨后首次出现持续回落。没人认为这是大事——「房地产市场总是局部调整」。",
+      "window": [
+        "2007-01-02",
+        "2007-06-30"
+      ],
+      "requires": [],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.08
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "housing",
+          "financials"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.004,
+        "volMultiplier": 1.05,
+        "creditSpreadDelta": 15,
+        "liquidityMultiplier": 0.98,
+        "repoHaircutDelta": 0,
+        "decayDays": 60
+      },
+      "affectsFragility": {
+        "CFC": 0.06,
+        "WM": 0.03,
+        "FNM": 0.03,
+        "FRE": 0.03
+      },
+      "unlocks": [
+        "subprime_delinquency_rise"
+      ],
+      "newsVisibility": 1,
+      "structural": true,
+      "sources": [
+        "Case-Shiller CSUSHPINSA",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "subprime_delinquency_rise",
+      "phase": 0,
+      "date": "2007-06-01",
+      "title": "次贷违约率加速上升",
+      "headline": "次级可调利率房贷 60 天以上逾期率升至 14%，创历史新高",
+      "narrative": "2005–2006 年发放的 2/28 可调利率房贷开始重置，借款人月供翻倍。违约率以每月 1 个百分点的速度上升。",
+      "window": [
+        "2007-03-01",
+        "2007-09-30"
+      ],
+      "requires": [
+        "housing_downturn"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.06
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "housing",
+          "financials"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.003,
+        "volMultiplier": 1.08,
+        "creditSpreadDelta": 40,
+        "liquidityMultiplier": 0.96,
+        "repoHaircutDelta": 0.01,
+        "decayDays": 90
+      },
+      "affectsFragility": {
+        "CFC": 0.14,
+        "IMB": 0.1,
+        "WM": 0.06,
+        "MBIA": 0.06,
+        "AMBAC": 0.06
+      },
+      "unlocks": [
+        "hsbc_subprime_warning",
+        "new_century_collapse"
+      ],
+      "newsVisibility": 1,
+      "structural": true,
+      "sources": [
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "hsbc_subprime_warning",
+      "phase": 0,
+      "date": "2007-02-08",
+      "title": "汇丰控股首次发出次贷拨备预警",
+      "headline": "汇丰宣布 105 亿美元坏账拨备，警告美国次贷市场「恶化速度超出预期」",
+      "narrative": "全球最大的银行之一率先承认在次级房贷上亏钱。市场的第一反应是「这是汇丰自己的问题」。",
+      "window": [
+        "2007-01-15",
+        "2007-04-30"
+      ],
+      "requires": [],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": -0.02,
+        "indexReturn": -0.002,
+        "volMultiplier": 1.06,
+        "creditSpreadDelta": 20,
+        "liquidityMultiplier": 0.99,
+        "repoHaircutDelta": 0,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "all_financials": 0.03
+      },
+      "unlocks": [
+        "new_century_collapse"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "HSBC 公告",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "new_century_collapse",
+      "phase": 0,
+      "date": "2007-04-02",
+      "title": "New Century 金融破产",
+      "headline": "美国第二大次级房贷机构 New Century 申请破产保护",
+      "narrative": "全美第二大次贷发放机构倒下。它的贷款随后被证明有极高比例的早期违约——这是欺诈与承销标准崩塌的第一个实证。",
+      "window": [
+        "2007-02-20",
+        "2007-06-30"
+      ],
+      "requires": [
+        "subprime_delinquency_rise"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "commercial_bank",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "housing",
+          "financials"
+        ],
+        "equityReturn": -0.35,
+        "indexReturn": -0.004,
+        "volMultiplier": 1.1,
+        "creditSpreadDelta": 35,
+        "liquidityMultiplier": 0.94,
+        "repoHaircutDelta": 0.01,
+        "decayDays": 12
+      },
+      "affectsFragility": {
+        "CFC": 0.1,
+        "IMB": 0.08,
+        "all_financials": 0.03
+      },
+      "unlocks": [
+        "bear_stearns_fund_margin_call"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "bear_stearns_fund_margin_call",
+      "phase": 1,
+      "date": "2007-06-20",
+      "title": "贝尔斯登两只对冲基金遭遇追保",
+      "headline": "贝尔斯登旗下两只次贷基金因追加保证金被迫暂停赎回，美林扣押其抵押品",
+      "narrative": "贝尔斯登内部的两只高杠杆结构化信贷基金爆仓。规模只有 200 亿美元，但这是华尔街第一次看到「AAA 级结构化产品卖不出去」。",
+      "window": [
+        "2007-05-15",
+        "2007-07-31"
+      ],
+      "requires": [
+        "subprime_delinquency_rise"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.05
+      },
+      "tier": "investment_bank",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "BSC",
+          "financials"
+        ],
+        "equityReturn": -0.05,
+        "indexReturn": -0.003,
+        "volMultiplier": 1.12,
+        "creditSpreadDelta": 45,
+        "liquidityMultiplier": 0.92,
+        "repoHaircutDelta": 0.02,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "BSC": 0.12,
+        "MER": 0.04
+      },
+      "unlocks": [
+        "bear_stearns_fund_bankrupt"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report",
+        "Bloomberg"
+      ]
+    },
+    {
+      "id": "bear_stearns_fund_bankrupt",
+      "phase": 1,
+      "date": "2007-07-31",
+      "title": "贝尔斯登基金申请破产",
+      "headline": "贝尔斯登旗下两只结构化信贷基金申请破产，投资者损失逾 16 亿美元",
+      "narrative": "两只基金归零。更严重的是，市场开始意识到全行业有数千亿美元的类似结构，且无法定价。",
+      "window": [
+        "2007-07-01",
+        "2007-08-31"
+      ],
+      "requires": [
+        "bear_stearns_fund_margin_call"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "investment_bank",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "BSC",
+          "financials"
+        ],
+        "equityReturn": -0.04,
+        "indexReturn": -0.01,
+        "volMultiplier": 1.25,
+        "creditSpreadDelta": 70,
+        "liquidityMultiplier": 0.82,
+        "repoHaircutDelta": 0.03,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "BSC": 0.14,
+        "LEH": 0.05,
+        "MER": 0.05,
+        "all_financials": 0.05
+      },
+      "unlocks": [
+        "bnp_paribas_freeze"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "bnp_paribas_freeze",
+      "phase": 1,
+      "date": "2007-08-09",
+      "title": "巴黎银行冻结三只基金 —— 危机正式开始",
+      "headline": "法国巴黎银行以「无法为资产定价」为由，冻结三只基金的全部赎回",
+      "narrative": "这是整场危机的起点。全世界最大的银行之一公开承认，它不知道自己持有的结构化产品值多少钱。银行间市场在数小时内冻结——没有一家机构愿意借钱给另一家。",
+      "window": [
+        "2007-07-20",
+        "2007-09-15"
+      ],
+      "requires": [
+        "bear_stearns_fund_bankrupt"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.15
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.03,
+        "indexReturn": -0.015,
+        "volMultiplier": 1.6,
+        "creditSpreadDelta": 110,
+        "liquidityMultiplier": 0.45,
+        "repoHaircutDelta": 0.08,
+        "decayDays": 30
+      },
+      "affectsFragility": {
+        "all_financials": 0.1,
+        "BSC": 0.1,
+        "LEH": 0.08,
+        "MER": 0.08,
+        "NRK": 0.2
+      },
+      "unlocks": [
+        "credit_market_freeze",
+        "countrywide_emergency_credit",
+        "northern_rock_run",
+        "fed_discount_rate_cut"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report",
+        "BNP Paribas 公告"
+      ]
+    },
+    {
+      "id": "credit_market_freeze",
+      "phase": 1,
+      "date": "2007-09-01",
+      "title": "资产支持商业票据市场关闭",
+      "headline": "ABCP 市场连续第四周零发行，规模从 1.2 万亿萎缩至 8000 亿",
+      "narrative": "依靠短期商业票据滚动融资的结构化工具全部卡住。这是「期限错配」第一次在全球范围内显形。",
+      "window": [
+        "2007-08-15",
+        "2007-12-31"
+      ],
+      "requires": [
+        "bnp_paribas_freeze"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "state",
+        "predicate": "liquidityMultiplier < 0.88"
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.008,
+        "volMultiplier": 1.3,
+        "creditSpreadDelta": 90,
+        "liquidityMultiplier": 0.55,
+        "repoHaircutDelta": 0.1,
+        "decayDays": 120
+      },
+      "affectsFragility": {
+        "all_financials": 0.08,
+        "C": 0.1,
+        "NRK": 0.15,
+        "BSC": 0.06,
+        "LEH": 0.06
+      },
+      "unlocks": [
+        "repo_funding_stress"
+      ],
+      "newsVisibility": 1,
+      "sources": [
+        "美联储 H.8 / CP 数据",
+        "Gorton & Metrick"
+      ]
+    },
+    {
+      "id": "countrywide_emergency_credit",
+      "phase": 1,
+      "date": "2007-08-16",
+      "title": "Countrywide 动用全部紧急信贷额度",
+      "headline": "全美最大房贷机构 Countrywide 被迫动用 115 亿美元银行信贷额度以避免破产",
+      "narrative": "它的融资模式是「用短期商业票据支持 30 年房贷」，票据市场一关，立刻濒死。这是整场危机里最纯粹的一次期限错配演示。",
+      "window": [
+        "2007-08-01",
+        "2007-10-15"
+      ],
+      "requires": [
+        "bnp_paribas_freeze"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "commercial_bank",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "CFC",
+          "housing",
+          "financials"
+        ],
+        "equityReturn": -0.18,
+        "indexReturn": -0.006,
+        "volMultiplier": 1.2,
+        "creditSpreadDelta": 50,
+        "liquidityMultiplier": 0.7,
+        "repoHaircutDelta": 0.04,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "CFC": 0.16,
+        "IMB": 0.08,
+        "WM": 0.05,
+        "WB": 0.04
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "fed_discount_rate_cut",
+      "phase": 1,
+      "date": "2007-08-17",
+      "title": "美联储下调贴现率 50 个基点",
+      "headline": "美联储将贴现率降至 5.75%，并延长可借期限至 30 天",
+      "narrative": "央行第一次出手。市场松了一口气——这个反应模式会在此后一年反复出现，直到它不再管用。",
+      "window": [
+        "2007-08-10",
+        "2007-09-30"
+      ],
+      "requires": [
+        "bnp_paribas_freeze"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.02,
+        "indexReturn": 0.018,
+        "volMultiplier": 0.85,
+        "creditSpreadDelta": -25,
+        "liquidityMultiplier": 1.25,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "all_financials": -0.04
+      },
+      "unlocks": [
+        "fed_cut_50bp"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "northern_rock_run",
+      "phase": 1,
+      "date": "2007-09-14",
+      "title": "北岩银行挤兑 —— 英国 150 年来第一次",
+      "headline": "北岩银行门外排起长队，三天内被取走 20 亿英镑存款",
+      "narrative": "一家资本充足率合格的银行，仅仅因为依赖批发融资，就在一纸消息之后被挤兑。它证明了：银行的死因不是资产质量，是融资结构。",
+      "window": [
+        "2007-08-20",
+        "2007-11-30"
+      ],
+      "requires": [
+        "bnp_paribas_freeze"
+      ],
+      "requireAnyOf": [
+        [
+          "credit_market_freeze"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.06
+      },
+      "tier": "overseas",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "NRK",
+          "financials"
+        ],
+        "equityReturn": -0.31,
+        "indexReturn": -0.005,
+        "volMultiplier": 1.35,
+        "creditSpreadDelta": 60,
+        "liquidityMultiplier": 0.6,
+        "repoHaircutDelta": 0.06,
+        "decayDays": 25
+      },
+      "affectsFragility": {
+        "all_financials": 0.06,
+        "HBOS": 0.08,
+        "RBS": 0.05,
+        "WM": 0.05,
+        "WB": 0.04
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "BBC",
+        "英国财政部"
+      ]
+    },
+    {
+      "id": "fed_cut_50bp",
+      "phase": 1,
+      "date": "2007-09-18",
+      "title": "美联储降息 50 个基点",
+      "headline": "联邦基金利率降至 4.75%，为四年来首次降息",
+      "narrative": "市场大涨。主流共识是「危机已经过去」。这个共识会持续八个月，直到贝尔斯登倒下。",
+      "window": [
+        "2007-09-01",
+        "2007-10-31"
+      ],
+      "requires": [
+        "fed_discount_rate_cut"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.03,
+        "indexReturn": 0.029,
+        "volMultiplier": 0.8,
+        "creditSpreadDelta": -40,
+        "liquidityMultiplier": 1.4,
+        "repoHaircutDelta": -0.03,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "all_financials": -0.06
+      },
+      "unlocks": [
+        "sp500_all_time_high",
+        "false_calm"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "sp500_all_time_high",
+      "phase": 1,
+      "date": "2007-10-09",
+      "title": "标普 500 创历史新高 1565 点",
+      "headline": "标普 500 指数收于 1565.15 点，历史最高",
+      "narrative": "危机已经开始两个月，股指却创了历史新高。这是本作给玩家的第一个陷阱：**看 K 线的人此刻会满仓做多。**",
+      "window": [
+        "2007-09-20",
+        "2007-11-15"
+      ],
+      "requires": [
+        "fed_cut_50bp"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.25
+      },
+      "tier": "macro",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [],
+        "equityReturn": 0,
+        "indexReturn": 0.006,
+        "volMultiplier": 0.75,
+        "creditSpreadDelta": -10,
+        "liquidityMultiplier": 1.3,
+        "repoHaircutDelta": 0,
+        "decayDays": 5
+      },
+      "affectsFragility": {
+        "all_financials": -0.05
+      },
+      "unlocks": [
+        "false_calm"
+      ],
+      "newsVisibility": 0,
+      "isTrap": true,
+      "trapNote": "这是全作最重要的一个陷阱。信用市场已经冻结，股价却在创新高。能同时看懂这两件事的玩家，才算真的懂了危机。",
+      "sources": [
+        "市场数据"
+      ]
+    },
+    {
+      "id": "false_calm",
+      "phase": 1,
+      "date": "2007-11-01",
+      "title": "「次贷问题已受控」",
+      "headline": "美国财政部长：次贷问题「基本受控」，不会拖累整体经济",
+      "narrative": "官方与主流媒体一致认为最坏的时候已经过去。信用利差在高位横盘，股指在下跌后反弹。所有信号都在说「没事了」。",
+      "window": [
+        "2007-10-15",
+        "2008-01-31"
+      ],
+      "requires": [
+        "fed_cut_50bp"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "macro",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [],
+        "equityReturn": 0,
+        "indexReturn": 0.004,
+        "volMultiplier": 0.7,
+        "creditSpreadDelta": 0,
+        "liquidityMultiplier": 1.2,
+        "repoHaircutDelta": 0,
+        "decayDays": 30
+      },
+      "affectsFragility": {
+        "all_financials": -0.06
+      },
+      "unlocks": [
+        "merrill_writedown_8b"
+      ],
+      "newsVisibility": 0,
+      "isTrap": true,
+      "trapNote": "降低波动率、降低利差、降低警惕。玩家如果在这里加杠杆做多，会在三个月后被清算。",
+      "sources": [
+        "公开讲话记录"
+      ]
+    },
+    {
+      "id": "merrill_writedown_8b",
+      "phase": 1,
+      "date": "2007-10-24",
+      "title": "美林减记 79 亿美元",
+      "headline": "美林公布 79 亿美元次贷相关减记，为华尔街史上最大单季亏损",
+      "narrative": "第一家大投行承认巨额损失。市场开始重新审视每一家的资产负债表——问题是，没人知道该怎么给这些资产定价。",
+      "window": [
+        "2007-10-01",
+        "2007-12-31"
+      ],
+      "requires": [
+        "false_calm"
+      ],
+      "requireAnyOf": [
+        [
+          "bnp_paribas_freeze"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.08
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "MER",
+          "financials"
+        ],
+        "equityReturn": -0.06,
+        "indexReturn": -0.008,
+        "volMultiplier": 1.3,
+        "creditSpreadDelta": 65,
+        "liquidityMultiplier": 0.8,
+        "repoHaircutDelta": 0.03,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "MER": 0.12,
+        "C": 0.06,
+        "LEH": 0.05,
+        "UBS": 0.06,
+        "all_financials": 0.05
+      },
+      "unlocks": [
+        "citigroup_writedown",
+        "taf_announced"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美林财报",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "citigroup_writedown",
+      "phase": 1,
+      "date": "2007-11-04",
+      "title": "花旗减记 110 亿，CEO 辞职",
+      "headline": "花旗集团宣布 110 亿美元减记，董事长兼 CEO Chuck Prince 辞职",
+      "narrative": "全球最大的银行承认自己在 SIV（结构性投资工具）上有巨额表外亏损。市场第一次意识到：亏损不只在大投行，也在商业银行。",
+      "window": [
+        "2007-10-15",
+        "2008-01-31"
+      ],
+      "requires": [
+        "merrill_writedown_8b"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "commercial_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "C",
+          "financials"
+        ],
+        "equityReturn": -0.07,
+        "indexReturn": -0.012,
+        "volMultiplier": 1.4,
+        "creditSpreadDelta": 80,
+        "liquidityMultiplier": 0.75,
+        "repoHaircutDelta": 0.04,
+        "decayDays": 25
+      },
+      "affectsFragility": {
+        "C": 0.14,
+        "WB": 0.05,
+        "WM": 0.05,
+        "UBS": 0.05,
+        "all_financials": 0.06
+      },
+      "unlocks": [
+        "taf_announced"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "花旗财报",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "taf_announced",
+      "phase": 1,
+      "date": "2007-12-12",
+      "title": "全球央行联合注入流动性",
+      "headline": "美联储联合欧央行、英央行宣布定期拍卖工具（TAF），规模逾 1000 亿美元",
+      "narrative": "五大央行史无前例地联合行动。市场短暂反弹，但银行间市场依然不信任——因为没人知道对手方的账上到底有什么。",
+      "window": [
+        "2007-11-15",
+        "2008-02-29"
+      ],
+      "requires": [
+        "merrill_writedown_8b"
+      ],
+      "requireAnyOf": [
+        [
+          "citigroup_writedown"
+        ],
+        [
+          "credit_market_freeze"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.01,
+        "indexReturn": 0.01,
+        "volMultiplier": 0.88,
+        "creditSpreadDelta": -20,
+        "liquidityMultiplier": 1.3,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "all_financials": -0.03
+      },
+      "unlocks": [
+        "monoline_crisis"
+      ],
+      "newsVisibility": 1,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "repo_funding_stress",
+      "phase": 1,
+      "date": "2007-12-31",
+      "title": "回购市场折扣率开始系统性上升",
+      "headline": "结构化产品回购折扣率（haircut）从 5% 升至 15%，融资能力全面收缩",
+      "narrative": "这个变化没人报道，也没有指标显示。但它意味着：**同样的资产，能借到的钱变少了。** 当 haircut 从 5% 涨到 45% 时，整条华尔街会在同一周内资不抵债。",
+      "window": [
+        "2007-10-01",
+        "2008-06-30"
+      ],
+      "requires": [
+        "credit_market_freeze"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "state",
+        "predicate": "creditSpread > 400"
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.005,
+        "volMultiplier": 1.2,
+        "creditSpreadDelta": 50,
+        "liquidityMultiplier": 0.7,
+        "repoHaircutDelta": 0.1,
+        "decayDays": 180
+      },
+      "affectsFragility": {
+        "BSC": 0.12,
+        "LEH": 0.1,
+        "MER": 0.08,
+        "GS": 0.06,
+        "MS": 0.06,
+        "all_financials": 0.06
+      },
+      "unlocks": [
+        "bear_stearns_collapse"
+      ],
+      "newsVisibility": 1,
+      "structural": true,
+      "sources": [
+        "Gorton & Metrick, Securitized Banking and the Run on Repo"
+      ]
+    }
+  ]
+}

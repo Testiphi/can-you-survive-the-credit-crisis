@@ -1,0 +1,938 @@
+/**
+ * GameEngine —— 引擎的唯一对外门面。
+ *
+ * 单回合时序严格遵循 docs/02 §4：
+ *   事件注入 → NPC 决策 → 市场出价 → 成交（t+1 开盘价） → 盯市 → 保证金 → 监管
+ *
+ * 铁律：玩家在 t 日看到的只有 ≤ t 日的信息，成交发生在 t+1。
+ */
+
+import type {
+  Account,
+  Bar,
+  EventCard,
+  Fill,
+  GameConfig,
+  GameState,
+  ImpactVector,
+  Institution,
+  InstitutionState,
+  InstitutionsFile,
+  MacroState,
+  NewsItem,
+  Order,
+  PlayerAction,
+  ScoreSnapshot,
+  TurnResult,
+} from './types.ts';
+import { DEFAULT_CONFIG, IDENTITY_PROFILE } from './types.ts';
+import { Rng, createStreams, type Streams } from './rng.ts';
+import { nextTradingDay, prevTradingDay, tradingDaysBetween, addDays } from './time.ts';
+import { DIFFICULTY_PROFILE, buildMacroSeries, haircutFromStress, systemicStress } from './economy.ts';
+import { INSTRUMENTS, INSTRUMENT_BY_ID, resolveImpact } from './instruments.ts';
+import {
+  applyFragilityDelta,
+  computeFragility,
+  initInstitutionStates,
+  markFailed,
+  updateConfidence,
+} from './institutions.ts';
+import { ScenarioEngine, type FireDecision } from './scenario.ts';
+import { executeOrder, generateBar } from './market.ts';
+import {
+  accrueBorrowFees,
+  applyFill,
+  checkMargin,
+  computeMaintenanceMargin,
+  createAccount,
+  positionQty,
+  markToMarket,
+  planLiquidation,
+} from './portfolio.ts';
+import { computeRepoState, forcedSaleNotional, repoEnabled } from './repo.ts';
+import {
+  addRule,
+  bannedShortScope,
+  createRegulatorState,
+  computeSrs,
+  derivedMarginMultiplier,
+  expireRules,
+  levelFromSrs,
+} from './regulator.ts';
+import { createAgents, flowToReturn, stepAgents } from './agents.ts';
+import { generateRumors, newsFromEvent, type GeneratedRumor, type RumorsFile } from './news.ts';
+import { makeContext } from './conditions.ts';
+
+export interface Dataset {
+  events: EventCard[];
+  institutions: InstitutionsFile;
+  rumors: RumorsFile;
+}
+
+export interface EngineOptions {
+  config?: Partial<GameConfig>;
+  /** 覆盖竞争风险模型的 κ */
+  kappa?: number;
+  /** 系统级事件的兜底触发余量（交易日） */
+  forceFireMarginDays?: number;
+  /** 关闭 NPC（用于单元测试与确定性回归） */
+  disableAgents?: boolean;
+  /** 关闭传闻生成 */
+  disableRumors?: boolean;
+}
+
+const COMMISSION_RATE = 0.0005;
+
+/** 机构 id → 可交易标的 id（用于 SRS 的敞口计算） */
+function buildInstitutionTickerMap(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const inst of INSTRUMENTS) {
+    if (inst.sector === 'index') continue;
+    out[inst.id] = inst.id;
+  }
+  return out;
+}
+
+export class GameEngine {
+  readonly config: GameConfig;
+  readonly state: GameState;
+  readonly dataset: Dataset;
+
+  private scenario: ScenarioEngine;
+  private streams: Streams;
+  private baseMacro: MacroState[];
+  private macroIndexByDate: Map<string, number>;
+  private haircutRatchet: number;
+  private cumulativePlayerImpact = 0;
+  private cumulativeMarketDecline = 0;
+  private adv20: Map<string, number> = new Map();
+  private prevPrices: Map<string, number> = new Map();
+  private rumorCooldownUntil: Map<string, number> = new Map();
+  private opts: EngineOptions;
+
+  constructor(dataset: Dataset, options: EngineOptions = {}) {
+    this.dataset = dataset;
+    this.opts = options;
+
+    const identity = options.config?.identity ?? DEFAULT_CONFIG.identity;
+    const profile = IDENTITY_PROFILE[identity];
+    this.config = {
+      ...DEFAULT_CONFIG,
+      ...options.config,
+      initialCapital: options.config?.initialCapital ?? profile.capital,
+    };
+
+    const diff = DIFFICULTY_PROFILE[this.config.difficulty];
+
+    this.streams = createStreams(this.config.seed);
+    this.baseMacro = buildMacroSeries(this.config.startDate, this.config.endDate, this.streams.market, {
+      noiseScale: diff.noiseScale,
+    });
+    this.macroIndexByDate = new Map(this.baseMacro.map((m, i) => [m.date, i]));
+
+    // O(1) 的交易日距离：直接查预计算的序号表。
+    // 默认的 tradingDayDiff 是逐日遍历，在「每回合 × 每张卡」的兜底检查里会成为瓶颈。
+    // 事件卡的 window 边界可能是周末/节假日，所以要向前回退到最近的交易日。
+    const ordinalOf = (d: string): number | undefined => {
+      const direct = this.macroIndexByDate.get(d);
+      if (direct !== undefined) return direct;
+      let cursor = d;
+      for (let i = 0; i < 7; i++) {
+        cursor = prevTradingDay(cursor);
+        const found = this.macroIndexByDate.get(cursor);
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    };
+    const dayDiff = (a: string, b: string): number => {
+      const ia = ordinalOf(a);
+      const ib = ordinalOf(b);
+      if (ia === undefined || ib === undefined) return 9999;
+      return ib - ia;
+    };
+
+    this.scenario = new ScenarioEngine(dataset.events, dataset.institutions, {
+      timeline: this.config.timeline,
+      difficulty: this.config.difficulty,
+      kappa: options.kappa ?? diff.hazardKappa,
+      forceFireMarginDays: options.forceFireMarginDays ?? 10,
+      dayDiff,
+    });
+
+    const startMacro = this.baseMacro[0];
+    const account = createAccount(this.config.initialCapital);
+
+    // 初始 K 线：所有标的以起始价开盘
+    const bars = new Map<string, Bar[]>();
+    const prices = new Map<string, number>();
+    for (const inst of INSTRUMENTS) {
+      prices.set(inst.id, inst.startPrice);
+      this.prevPrices.set(inst.id, inst.startPrice);
+      this.adv20.set(inst.id, inst.baseAdv);
+      bars.set(inst.id, [
+        {
+          date: this.config.startDate,
+          open: inst.startPrice,
+          high: inst.startPrice,
+          low: inst.startPrice,
+          close: inst.startPrice,
+          volume: Math.round(inst.baseAdv / inst.startPrice),
+          adv20: inst.baseAdv,
+        },
+      ]);
+    }
+
+    this.haircutRatchet = startMacro.repoHaircut;
+
+    this.state = {
+      config: this.config,
+      date: this.config.startDate,
+      turnIndex: 0,
+      bars,
+      prices,
+      macro: { ...startMacro },
+      player: account,
+      agents: options.disableAgents ? [] : createAgents(this.streams.agents),
+      regulator: createRegulatorState(),
+      institutions: initInstitutionStates(dataset.institutions),
+      firedEvents: [],
+      activeEffects: [],
+      news: [],
+      score: [{ date: this.config.startDate, equity: account.equity, drawdown: 0 }],
+      pendingOrders: [],
+      haltTrading: false,
+    };
+  }
+
+  // ------------------------------------------------------------ 只读视图
+
+  /**
+   * 玩家可见的 K 线。**这是防止未来函数泄露的唯一入口**——UI 不允许直接读 state.bars。
+   * 见 docs/02 §3.1 与 §8。
+   */
+  visibleBars(instrumentId: string): Bar[] {
+    const all = this.state.bars.get(instrumentId) ?? [];
+    let lo = 0;
+    let hi = all.length;
+    // 二分查找最后一条 <= state.date 的记录
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (all[mid].date <= this.state.date) lo = mid + 1;
+      else hi = mid;
+    }
+    return all.slice(0, lo);
+  }
+
+  get isOver(): boolean {
+    return this.state.date >= this.config.endDate || this.state.player.bankrupt;
+  }
+
+  /** 剩余交易日数 */
+  get remainingTurns(): number {
+    return tradingDaysBetween(nextTradingDay(this.state.date), this.config.endDate).length;
+  }
+
+  // ------------------------------------------------------------ 玩家操作
+
+  submitOrder(order: Order): void {
+    this.state.pendingOrders.push({ ...order, submittedAt: this.state.date });
+  }
+
+  /** 便捷封装：按金额下单（正=买入，负=卖出）。 */
+  submitByNotional(instrumentId: string, notional: number): Order | null {
+    const price = this.state.prices.get(instrumentId);
+    if (!price || price <= 0) return null;
+    const qty = Math.floor(Math.abs(notional) / price);
+    if (qty <= 0) return null;
+    const order: Order = {
+      instrumentId,
+      side: notional > 0 ? 'buy' : 'sell',
+      quantity: qty,
+      kind: 'market',
+      submittedAt: this.state.date,
+    };
+    this.submitOrder(order);
+    return order;
+  }
+
+  // ------------------------------------------------------------ 回合推进
+
+  advance(): TurnResult {
+    if (this.isOver) {
+      return {
+        date: this.state.date,
+        turnIndex: this.state.turnIndex,
+        fills: [],
+        firedEventIds: [],
+        news: [],
+        equity: this.state.player.equity,
+        marginCall: this.state.player.marginCall,
+        bankrupt: this.state.player.bankrupt,
+      };
+    }
+
+    const diff = DIFFICULTY_PROFILE[this.config.difficulty];
+    const nextDate = nextTradingDay(this.state.date);
+    const idx = this.macroIndexByDate.get(nextDate);
+    const base: MacroState =
+      idx !== undefined ? this.baseMacro[idx] : { ...this.baseMacro[this.baseMacro.length - 1], date: nextDate };
+    const prevBase = idx !== undefined && idx > 0 ? this.baseMacro[idx - 1] : base;
+
+    // ---- 0) 时间推进 ----
+    this.state.date = nextDate;
+    this.state.turnIndex += 1;
+
+    // ---- 1) 衰减既有冲击 ----
+    for (const e of this.state.activeEffects) e.remaining -= 1;
+    this.state.activeEffects = this.state.activeEffects.filter((e) => e.remaining > 0);
+
+    // ---- 2) 事件注入 ----
+    const ctx = this.buildContext(base);
+    const decisions = this.scenario.tick(ctx, this.streams.scenario, this.state.institutions);
+    const firedEventIds: string[] = [];
+    const newNews: NewsItem[] = [];
+
+    for (const d of decisions) {
+      this.applyEvent(d, newNews);
+      firedEventIds.push(d.card.id);
+      this.state.firedEvents.push(d.card.id);
+    }
+
+    // 事件后机构信心与脆弱度刷新
+    updateConfidence(this.state.institutions, { ...base, systemicStress: ctx.systemicStress });
+    this.recomputeFragility(base);
+
+    // ---- 3) 汇总修正量 ----
+    const mods = this.aggregateModifiers();
+
+    // ---- 4) 宏观状态（基础路径 + 事件修正） ----
+    // TED 利差不由事件卡直接驱动，而是由信用利差的上行推导出来——
+    // 否则 state 型判据（如 tedSpread > 2.6）永远无法在正确的时间满足。
+    const derivedTed = base.tedSpread + Math.max(0, mods.creditBump) / 1000;
+    const stress = systemicStress(
+      base.creditSpread + mods.creditBump,
+      derivedTed,
+      base.vix * mods.volMult,
+    );
+    this.haircutRatchet = Math.max(
+      haircutFromStress(stress),
+      this.haircutRatchet + (haircutFromStress(stress) - this.haircutRatchet) * 0.006,
+    );
+    this.state.macro = {
+      date: nextDate,
+      spx: 0,
+      // 上限用于防御：VIX 历史盘中最高的 89.53，信用利差峰值约 2100bp
+      vix: Math.min(110, Math.max(9, base.vix * mods.volMult)),
+      creditSpread: Math.min(3000, Math.max(180, base.creditSpread + mods.creditBump)),
+      tedSpread: Math.min(6, derivedTed),
+      systemicStress: stress,
+      liquidity: clamp(base.liquidity * mods.liqMult, 0.05, 1),
+      repoHaircut: clamp(this.haircutRatchet, 0.01, 1),
+    };
+
+    // ---- 5) NPC 决策 ----
+    let agentFlow = new Map<string, number>();
+    if (this.state.agents.length > 0) {
+      const res = stepAgents(
+        this.state.agents,
+        this.state.prices,
+        this.prevPrices,
+        this.state.macro,
+        this.streams.agents,
+      );
+      agentFlow = res.netFlow;
+    }
+
+    // ---- 6) 市场出价 ----
+    const baseReturn = prevBase.spx > 0 ? base.spx / prevBase.spx - 1 : 0;
+    const spxFlowImpact = flowToReturn(
+      agentFlow.get('SPX') ?? 0,
+      5e10,
+      this.state.macro.liquidity,
+      diff.impactEta,
+      0.015,
+    );
+    const spxReturn = baseReturn + mods.indexReturn + spxFlowImpact;
+
+    const newBars = new Map<string, Bar>();
+    for (const inst of INSTRUMENTS) {
+      const prevClose = this.state.prices.get(inst.id) ?? inst.startPrice;
+      const extra =
+        mods.perInstrument.get(inst.id) ??
+        flowToReturn(
+          agentFlow.get(inst.id) ?? 0,
+          this.adv20.get(inst.id) ?? inst.baseAdv,
+          this.state.macro.liquidity,
+          diff.impactEta,
+          inst.idioVol,
+        );
+      const bar = generateBar(
+        inst,
+        nextDate,
+        prevClose,
+        spxReturn,
+        this.streams.market,
+        this.state.macro,
+        this.adv20.get(inst.id) ?? inst.baseAdv,
+        extra,
+      );
+      newBars.set(inst.id, bar);
+      this.adv20.set(inst.id, bar.adv20);
+    }
+
+    // 标普价格由基础路径决定（指数不接受个股的 equityReturn）
+    const spxBars = this.state.bars.get('SPX')!;
+    const prevSpxClose = spxBars[spxBars.length - 1].close;
+    const spxBar = newBars.get('SPX')!;
+    spxBar.close = round2(Math.max(1, base.spx * (1 + mods.indexReturn + spxFlowImpact)));
+    spxBar.open = round2(prevSpxClose * (1 + spxReturn * 0.4));
+    spxBar.high = round2(Math.max(spxBar.open, spxBar.close) * 1.004);
+    spxBar.low = round2(Math.min(spxBar.open, spxBar.close) * 0.996);
+
+    // 落盘
+    for (const [id, bar] of newBars) {
+      this.state.bars.get(id)!.push(bar);
+      this.state.prices.set(id, bar.close);
+    }
+    this.state.macro.spx = spxBar.close;
+
+    // 累计市场跌幅（用于 SRS 的市场压力贡献）
+    if (spxReturn < 0) this.cumulativeMarketDecline += Math.abs(spxReturn) * 1e11;
+
+    // ---- 7) 成交（t+1 开盘价） ----
+    const fills = this.executePending(newBars, nextDate);
+
+    // ---- 8) 借券费与盯市 ----
+    // 借券费随危机与做空拥挤度飙升（见 docs/07 §5.4）：
+    // 这是「做空不是免费午餐」的第一道成本约束。
+    // 历史：2008 年金融股借券费年化可达 20% 以上。
+    const borrowMult = mods.borrowMult * (1 + 40 * this.state.macro.systemicStress);
+    for (const pos of this.state.player.positions.values()) {
+      if (pos.quantity < 0) {
+        pos.borrowFeeRate = Math.min(0.6, 0.005 * borrowMult);
+      }
+    }
+    accrueBorrowFees(this.state.player, this.state.prices);
+    markToMarket(this.state.player, this.state.prices);
+
+    // ---- 9) 回购融资与被迫卖出 ----
+    this.settleRepo(newBars, nextDate, fills);
+
+    // ---- 10) 保证金检查与强平 ----
+    this.settleMargin(newBars, nextDate, fills);
+
+    // ---- 11) 监管 ----
+    this.stepRegulator(base);
+
+    // ---- 12) 新闻与传闻 ----
+    this.stepRumors(newNews, ctx);
+
+    // ---- 13) 记分快照 ----
+    const snap: ScoreSnapshot = {
+      date: nextDate,
+      equity: this.state.player.equity,
+      drawdown: this.state.player.maxDrawdown,
+    };
+    this.state.score.push(snap);
+
+    // ---- 14) 记账与清理 ----
+    if (this.state.pendingOrders.length > 0) {
+      const action: PlayerAction = { turnIndex: this.state.turnIndex, date: nextDate, orders: this.state.pendingOrders };
+      this.state.news.push(...newNews);
+      this.state.pendingOrders = [];
+      void action; // 操作日志在 SaveFile 层维护
+    } else {
+      this.state.news.push(...newNews);
+    }
+
+    this.prevPrices = new Map(this.state.prices);
+
+    return {
+      date: nextDate,
+      turnIndex: this.state.turnIndex,
+      fills,
+      firedEventIds,
+      news: newNews,
+      equity: this.state.player.equity,
+      marginCall: this.state.player.marginCall,
+      bankrupt: this.state.player.bankrupt,
+    };
+  }
+
+  // ------------------------------------------------------------ 内部步骤
+
+  private buildContext(base: MacroState) {
+    const account = this.state.player;
+    const shortConcentration: Record<string, number> = {};
+    for (const pos of account.positions.values()) {
+      if (pos.quantity >= 0) continue;
+      const inst = INSTRUMENT_BY_ID.get(pos.instrumentId);
+      if (!inst || inst.sharesOutstanding <= 0) continue;
+      shortConcentration[pos.instrumentId] = Math.abs(pos.quantity) / inst.sharesOutstanding;
+    }
+
+    const lev = account.equity > 0 ? grossExposureOf(account, this.state.prices) / account.equity : 1;
+
+    return makeContext({
+      date: this.state.date,
+      turnIndex: this.state.turnIndex,
+      spx: base.spx,
+      vix: base.vix,
+      creditSpread: base.creditSpread,
+      tedSpread: base.tedSpread,
+      liquidity: base.liquidity,
+      systemicStress: base.systemicStress,
+      repoHaircut: this.haircutRatchet,
+      srs: this.state.regulator.srs,
+      leverage: lev,
+      shortConcentration,
+      fired: new Set(this.state.firedEvents),
+    });
+  }
+
+  private applyEvent(d: FireDecision, newsOut: NewsItem[]): void {
+    const card = d.card;
+    const difficulty = this.config.difficulty;
+
+    // 幅度抖动：impact × (1 + ε)，见 docs/02 §7.2
+    const jittered = this.scenario.jitterImpact(card, this.streams.scenario) as ImpactVector;
+
+    this.state.activeEffects.push({
+      eventId: card.id,
+      appliedOn: this.state.date,
+      impact: jittered,
+      remaining: card.impact.decayDays,
+      total: card.impact.decayDays,
+    });
+
+    // 机构脆弱度传染
+    applyFragilityDelta(this.state.institutions, this.dataset.institutions, card.affectsFragility);
+
+    // 机构死亡：只由显式声明的 terminalFailure 决定。
+    // 早前版本对所有竞争风险卡都标记死亡，导致同一机构的后续卡永久失去资格。
+    if (card.terminalFailure) {
+      for (const instId of card.terminalFailure) {
+        if (this.state.institutions[instId]) {
+          markFailed(this.state.institutions, instId, this.state.date, card.id);
+        }
+      }
+    }
+
+    // 回购折扣率的永久棘轮
+    if (card.impact.repoHaircutDelta) {
+      this.haircutRatchet = clamp(this.haircutRatchet + card.impact.repoHaircutDelta, 0.01, 1);
+    }
+
+    // 监管规则注入
+    if (card.imposesRule) {
+      addRule(this.state.regulator, {
+        kind: card.imposesRule.kind,
+        scope: card.imposesRule.scope,
+        durationDays: card.imposesRule.durationDays,
+        date: this.state.date,
+        sourceEventId: card.id,
+      });
+    }
+
+    // 新闻（仅难度允许时对玩家展示，但事件本身总会发生）
+    if (this.scenario.visibilityOk(card)) {
+      newsOut.push(
+        newsFromEvent(card, this.state.date, difficulty, this.streams.news, DIFFICULTY_PROFILE[difficulty].newsNoise),
+      );
+    }
+  }
+
+  private recomputeFragility(base: MacroState): void {
+    const file = this.dataset.institutions;
+    const instById = new Map(file.institutions.map((i) => [i.id, i]));
+    for (const [id, s] of Object.entries(this.state.institutions)) {
+      const inst = instById.get(id);
+      if (!inst) continue;
+      const recomputed = computeFragility(inst, s, file.weights, base.systemicStress);
+      // 事件带来的额外脆弱度（applyFragilityDelta）叠加在模型值之上
+      s.fragility = Math.max(recomputed, Math.min(1.3, s.fragility));
+    }
+  }
+
+  private aggregateModifiers(): {
+    indexReturn: number;
+    creditBump: number;
+    volMult: number;
+    liqMult: number;
+    borrowMult: number;
+    marginMult: number;
+    shortableRestricted: boolean;
+    perInstrument: Map<string, number>;
+  } {
+    let indexReturn = 0;
+    let creditBump = 0;
+    let volMult = 1;
+    let liqMult = 1;
+    let borrowMult = 1;
+    let marginMult = 1;
+    let shortableRestricted = false;
+    const perInstrument = new Map<string, number>();
+
+    for (const e of this.state.activeEffects) {
+      const w = e.total > 0 ? e.remaining / e.total : 0;
+      const im = e.impact;
+      indexReturn += (im.indexReturn ?? 0) * w;
+      creditBump += (im.creditSpreadDelta ?? 0) * w;
+
+      // 乘数类字段用「最强事件主导」而不是连乘。
+      // 连乘会让多个重叠事件把 VIX 推到 200 以上（实测），彻底破坏数值可信度。
+      volMult = Math.max(volMult, 1 + ((im.volMultiplier ?? 1) - 1) * w);
+      liqMult = Math.min(liqMult, 1 + ((im.liquidityMultiplier ?? 1) - 1) * w);
+      borrowMult = Math.max(borrowMult, 1 + ((im.borrowFeeMultiplier ?? 1) - 1) * w);
+      marginMult = Math.max(marginMult, 1 + ((im.marginRequirementMultiplier ?? 1) - 1) * w);
+      if (im.shortableRestriction) shortableRestricted = true;
+
+      const resolved = resolveImpact(im);
+      for (const [id, v] of resolved.perInstrument) {
+        perInstrument.set(id, (perInstrument.get(id) ?? 0) + v * w);
+      }
+    }
+
+    // 流动性乘数的下限：允许严重收缩，但不允许归零
+    liqMult = Math.max(0.3, liqMult);
+
+    return { indexReturn, creditBump, volMult, liqMult, borrowMult, marginMult, shortableRestricted, perInstrument };
+  }
+
+  private executePending(newBars: Map<string, Bar>, date: string): Fill[] {
+    const diff = DIFFICULTY_PROFILE[this.config.difficulty];
+    const fills: Fill[] = [];
+    const bannedSectors = bannedShortScope(this.state.regulator);
+    const shortBanned = new Set<string>();
+    for (const inst of INSTRUMENTS) {
+      if (inst.sector === 'index') continue;
+      if (bannedSectors.has(inst.sector) || bannedSectors.has(inst.id)) shortBanned.add(inst.id);
+    }
+
+    for (const order of this.state.pendingOrders) {
+      const bar = newBars.get(order.instrumentId);
+      const inst = INSTRUMENT_BY_ID.get(order.instrumentId);
+      if (!bar || !inst) continue;
+
+      const fill = executeOrder({
+        order,
+        openPrice: bar.open,
+        adv20: bar.adv20,
+        liquidity: this.state.macro.liquidity,
+        dailyVol: inst.idioVol + 0.01,
+        currentQty: positionQty(this.state.player, order.instrumentId),
+        shortable: inst.shortable,
+        rng: this.streams.market,
+        params: {
+          eta: diff.impactEta,
+          marginRate: 0.25,
+          commissionRate: COMMISSION_RATE,
+          shortBanned,
+        },
+      });
+
+      if (fill.quantity > 0) {
+        fill.filledAt = date;
+        applyFill(this.state.player, fill, date);
+        this.cumulativePlayerImpact += fill.quantity * fill.price * fill.impact;
+      }
+      fills.push(fill);
+    }
+    return fills;
+  }
+
+  private settleRepo(newBars: Map<string, Bar>, date: string, fills: Fill[]): void {
+    const lev = this.state.player.equity > 0 ? grossExposureOf(this.state.player, this.state.prices) / this.state.player.equity : 1;
+    const marginMult = derivedMarginMultiplier(this.state.regulator);
+    const repoState = computeRepoState(
+      this.state.player,
+      this.state.prices,
+      this.state.macro,
+      lev,
+      this.state.regulator.srs,
+      { identity: this.config.identity, difficulty: this.config.difficulty, marginMultiplier: marginMult },
+    );
+
+    this.state.player.repoCapacity = repoState.capacity;
+    this.state.player.repoUsed = repoState.used;
+    this.state.player.repoRolloverRate = repoState.rolloverRate;
+
+    if (!repoState.forcedSale || repoState.shortfall <= 0) return;
+
+    // 融资缺口 → 被迫卖出（火售）
+    const need = forcedSaleNotional(repoState);
+    const longs = [...this.state.player.positions.values()]
+      .filter((p) => p.quantity > 0)
+      .map((p) => ({ p, value: p.quantity * (this.state.prices.get(p.instrumentId) ?? p.avgPrice) }))
+      .sort((a, b) => b.value - a.value);
+
+    let covered = 0;
+    for (const { p, value } of longs) {
+      if (covered >= need) break;
+      const price = this.state.prices.get(p.instrumentId) ?? p.avgPrice;
+      const target = Math.min(value, need - covered);
+      const qty = Math.floor(target / Math.max(0.01, price));
+      if (qty <= 0) continue;
+      const fill = executeOrder({
+        order: {
+          instrumentId: p.instrumentId,
+          side: 'sell',
+          quantity: qty,
+          kind: 'market',
+          submittedAt: date,
+        },
+        openPrice: price,
+        adv20: newBars.get(p.instrumentId)?.adv20 ?? 1e9,
+        liquidity: this.state.macro.liquidity,
+        dailyVol: (INSTRUMENT_BY_ID.get(p.instrumentId)?.idioVol ?? 0.02) + 0.01,
+        currentQty: p.quantity,
+        shortable: true,
+        rng: this.streams.market,
+        params: {
+          eta: DIFFICULTY_PROFILE[this.config.difficulty].impactEta,
+          marginRate: 0.25,
+          commissionRate: COMMISSION_RATE,
+          shortBanned: new Set(),
+        },
+        // 被迫卖出永远发生在最差的价格上
+        slippagePenalty: 2,
+      });
+      if (fill.quantity > 0) {
+        fill.filledAt = date;
+        applyFill(this.state.player, fill, date);
+        fills.push(fill);
+      }
+      covered += target;
+    }
+    markToMarket(this.state.player, this.state.prices);
+  }
+
+  private settleMargin(newBars: Map<string, Bar>, date: string, fills: Fill[]): void {
+    const marginMult = derivedMarginMultiplier(this.state.regulator);
+    const mm = computeMaintenanceMargin(this.state.player, this.state.prices, { marginMultiplier: marginMult });
+    this.state.player.maintenanceMargin = mm;
+
+    const { status, deficit } = checkMargin(this.state.player, this.state.prices, mm);
+
+    if (status === 'ok') {
+      this.state.player.marginCall = false;
+      this.state.player.marginCallSince = undefined;
+      return;
+    }
+
+    if (status === 'margin_call') {
+      if (!this.state.player.marginCall) {
+        this.state.player.marginCall = true;
+        this.state.player.marginCallSince = date;
+      }
+      return;
+    }
+
+    // 强平：惩罚性滑点 2×
+    const plan = planLiquidation(this.state.player, this.state.prices, deficit);
+    for (const item of plan) {
+      const side = item.quantity > 0 ? 'sell' : 'buy';
+      const qty = Math.abs(item.quantity);
+      const price = this.state.prices.get(item.instrumentId) ?? 1;
+      const fill = executeOrder({
+        order: { instrumentId: item.instrumentId, side, quantity: qty, kind: 'market', submittedAt: date },
+        openPrice: price,
+        adv20: newBars.get(item.instrumentId)?.adv20 ?? 1e9,
+        liquidity: this.state.macro.liquidity,
+        dailyVol: (INSTRUMENT_BY_ID.get(item.instrumentId)?.idioVol ?? 0.02) + 0.01,
+        currentQty: positionQty(this.state.player, item.instrumentId),
+        shortable: true,
+        rng: this.streams.market,
+        params: {
+          eta: DIFFICULTY_PROFILE[this.config.difficulty].impactEta,
+          marginRate: 0.25,
+          commissionRate: COMMISSION_RATE,
+          shortBanned: new Set(),
+        },
+        slippagePenalty: 2,
+      });
+      if (fill.quantity > 0) {
+        fill.filledAt = date;
+        applyFill(this.state.player, fill, date);
+        fills.push(fill);
+      }
+    }
+    markToMarket(this.state.player, this.state.prices);
+    this.state.player.marginCall = this.state.player.equity < mm;
+  }
+
+  private stepRegulator(base: MacroState): void {
+    expireRules(this.state.regulator, this.state.date);
+
+    const spxBars = this.state.bars.get('SPX')!;
+    const recent = spxBars.slice(-21);
+    const marketDown = recent.length > 1 && recent[recent.length - 1].close < recent[0].close * 0.9;
+
+    const srs = computeSrs({
+      account: this.state.player,
+      prices: this.state.prices,
+      institutions: this.state.institutions,
+      institutionToTicker: buildInstitutionTickerMap(),
+      cumulativePlayerImpact: this.cumulativePlayerImpact,
+      cumulativeMarketDecline: this.cumulativeMarketDecline,
+    });
+
+    this.state.regulator.srs = srs.srs;
+    this.state.regulator.shortConcentration = srs.shortConcentration;
+    this.state.regulator.level = levelFromSrs(
+      srs.srs,
+      srs.shortConcentration,
+      this.state.player.bankrupt,
+      marketDown,
+    );
+    this.state.regulator.priceImpactShare =
+      this.cumulativeMarketDecline > 0
+        ? clamp(this.cumulativePlayerImpact / this.cumulativeMarketDecline, 0, 1)
+        : 0;
+
+    void base;
+  }
+
+  private stepRumors(newNews: NewsItem[], ctx: ReturnType<typeof makeContext>): void {
+    if (this.opts.disableRumors) return;
+    const difficulty = this.config.difficulty;
+    const stress = this.state.macro.systemicStress;
+
+    // 生成频率：平静期每 3–5 日一条，危机期每日 1–3 条
+    const count = stress > 0.6 ? (this.streams.news.chance(0.4) ? 3 : 2) : this.streams.news.chance(0.3) ? 1 : 0;
+    if (count === 0) return;
+
+    const cooldown = new Set<string>();
+    for (const [id, until] of this.rumorCooldownUntil) {
+      if (this.state.turnIndex < until) cooldown.add(id);
+    }
+
+    const institutionIds = Object.keys(this.state.institutions);
+    const institutionNames: Record<string, string> = {};
+    for (const inst of this.dataset.institutions.institutions) institutionNames[inst.id] = inst.name;
+
+    const generated: GeneratedRumor[] = generateRumors(
+      this.dataset.rumors,
+      {
+        date: this.state.date,
+        condition: ctx,
+        institutions: this.state.institutions,
+        institutionIds,
+        institutionNames,
+        recentMarketReturn: this.recentMarketReturn(),
+      },
+      this.streams.news,
+      { difficulty, count, onCooldown: cooldown },
+    );
+
+    for (const g of generated) {
+      newNews.push(g.news);
+      // 冷却
+      const template = this.dataset.rumors.templates.find((t) => t.id === g.templateId);
+      if (template) this.rumorCooldownUntil.set(template.id, this.state.turnIndex + template.cooldownDays);
+
+      // 只有在「被相信」时才影响机构脆弱度（自我实现的链条）
+      if (g.news.credibility > 0.5 && Math.abs(g.fragilityEffect) > 0) {
+        for (const s of Object.values(this.state.institutions)) {
+          if (!s.alive) continue;
+          s.fragility = Math.max(0, s.fragility + g.fragilityEffect * 0.5);
+        }
+      }
+    }
+  }
+
+  private recentMarketReturn(): number {
+    const bars = this.state.bars.get('SPX')!;
+    const n = Math.min(20, bars.length - 1);
+    if (n <= 0) return 0;
+    const last = bars[bars.length - 1].close;
+    const then = bars[bars.length - 1 - n].close;
+    return then > 0 ? last / then - 1 : 0;
+  }
+
+  // ------------------------------------------------------------ 序列化
+
+  /** 存档 = { 种子, 配置, 操作日志 }，见 docs/02 §5。 */
+  save(): { config: GameConfig; seed: number; date: string; turnIndex: number; equity: number } {
+    return {
+      config: this.config,
+      seed: this.config.seed,
+      date: this.state.date,
+      turnIndex: this.state.turnIndex,
+      equity: this.state.player.equity,
+    };
+  }
+
+  /** 面向 UI 的摘要。 */
+  summary(): {
+    date: string;
+    turnIndex: number;
+    equity: number;
+    cash: number;
+    maxDrawdown: number;
+    marginCall: boolean;
+    bankrupt: boolean;
+    positions: Array<{ id: string; qty: number; avgPrice: number; price: number; pnl: number }>;
+    macro: MacroState;
+    regulatorLevel: number;
+    srs: number;
+  } {
+    const positions = [...this.state.player.positions.values()].map((p) => {
+      const price = this.state.prices.get(p.instrumentId) ?? p.avgPrice;
+      return {
+        id: p.instrumentId,
+        qty: p.quantity,
+        avgPrice: p.avgPrice,
+        price,
+        pnl: (price - p.avgPrice) * p.quantity,
+      };
+    });
+    return {
+      date: this.state.date,
+      turnIndex: this.state.turnIndex,
+      equity: this.state.player.equity,
+      cash: this.state.player.cash,
+      maxDrawdown: this.state.player.maxDrawdown,
+      marginCall: this.state.player.marginCall,
+      bankrupt: this.state.player.bankrupt,
+      positions,
+      macro: this.state.macro,
+      regulatorLevel: this.state.regulator.level,
+      srs: this.state.regulator.srs,
+    };
+  }
+
+  institutionList(): Institution[] {
+    return this.dataset.institutions.institutions;
+  }
+
+  institutionState(id: string): InstitutionState | undefined {
+    return this.state.institutions[id];
+  }
+}
+
+// ---------------------------------------------------------------- 工具
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+function round2(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
+function grossExposureOf(account: Account, prices: Map<string, number>): number {
+  let v = 0;
+  for (const pos of account.positions.values()) {
+    const p = prices.get(pos.instrumentId) ?? pos.avgPrice;
+    v += Math.abs(pos.quantity) * p;
+  }
+  return v;
+}
+
+/** 由起始日生成全部交易日（供 UI 的时间轴使用）。 */
+export function timelineOf(config: GameConfig): string[] {
+  return tradingDaysBetween(config.startDate, config.endDate);
+}
+
+export { Rng, addDays, resolveImpact };

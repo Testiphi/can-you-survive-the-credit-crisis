@@ -1,0 +1,2174 @@
+{
+  "version": 1,
+  "year": 2008,
+  "note": "impact 数值为设计校准值，基于历史量级估算。imposesRule 字段用于向 RegulatorState.activeRules 写入规则。",
+  "events": [
+    {
+      "id": "monoline_crisis",
+      "phase": 2,
+      "date": "2008-02-01",
+      "title": "债券保险商 MBIA / Ambac 面临降级",
+      "headline": "评级机构警告将下调 MBIA 与 Ambac 评级，逾 2.4 万亿美元市政与结构化债券受到牵连",
+      "narrative": "两家债券保险商（monoline）担保了数万亿债券。它们一旦被降级，**所有被担保的债券会同时被降级**——这是危机中最纯粹的机械性传染放大器。",
+      "window": [
+        "2007-12-15",
+        "2008-03-31"
+      ],
+      "requires": [
+        "taf_announced"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.07
+      },
+      "tier": "insurer",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "MBIA",
+          "AMBAC",
+          "financials",
+          "muni"
+        ],
+        "equityReturn": -0.15,
+        "indexReturn": -0.012,
+        "volMultiplier": 1.45,
+        "creditSpreadDelta": 95,
+        "liquidityMultiplier": 0.72,
+        "repoHaircutDelta": 0.05,
+        "decayDays": 25
+      },
+      "affectsFragility": {
+        "MBIA": 0.15,
+        "AMBAC": 0.15,
+        "C": 0.06,
+        "UBS": 0.05,
+        "all_financials": 0.05
+      },
+      "unlocks": [
+        "carlyle_capital_default"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report",
+        "评级机构公告"
+      ]
+    },
+    {
+      "id": "bank_of_america_buys_countrywide",
+      "phase": 2,
+      "date": "2008-01-11",
+      "title": "美国银行收购 Countrywide",
+      "headline": "美国银行宣布以约 40 亿美元收购全美最大房贷机构 Countrywide",
+      "narrative": "曾经的行业龙头以不足危机前市值的 5% 被收购。市场解读为「危机在出清」——这是又一个错误的安慰。",
+      "window": [
+        "2007-12-01",
+        "2008-03-15"
+      ],
+      "requires": [
+        "countrywide_emergency_credit"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "commercial_bank",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "CFC",
+          "BAC"
+        ],
+        "equityReturn": -0.28,
+        "indexReturn": 0.005,
+        "volMultiplier": 0.92,
+        "creditSpreadDelta": -15,
+        "liquidityMultiplier": 1.15,
+        "repoHaircutDelta": -0.01,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "CFC": -0.4,
+        "BAC": 0.08,
+        "IMB": 0.05
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "并购公告"
+      ]
+    },
+    {
+      "id": "citigroup_writedown_18b",
+      "phase": 2,
+      "date": "2008-01-15",
+      "title": "花旗单季亏损 98 亿美元",
+      "headline": "花旗集团宣布 181 亿美元减记，季度亏损 98 亿美元，为成立以来最大",
+      "narrative": "全球最大的银行单季亏损创历史纪录。它同时宣布裁员 4200 人，并向中东主权基金募资 75 亿美元。",
+      "window": [
+        "2007-12-15",
+        "2008-02-28"
+      ],
+      "requires": [
+        "citigroup_writedown"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "commercial_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "C",
+          "financials"
+        ],
+        "equityReturn": -0.07,
+        "indexReturn": -0.015,
+        "volMultiplier": 1.4,
+        "creditSpreadDelta": 75,
+        "liquidityMultiplier": 0.78,
+        "repoHaircutDelta": 0.04,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "C": 0.12,
+        "MER": 0.06,
+        "WB": 0.05,
+        "all_financials": 0.05
+      },
+      "unlocks": [
+        "global_equity_selloff_jan2008"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "花旗财报"
+      ]
+    },
+    {
+      "id": "merrill_writedown_14b",
+      "phase": 2,
+      "date": "2008-01-17",
+      "title": "美林单季亏损 98 亿美元",
+      "headline": "美林宣布 141 亿美元 CDO 减记，季度亏损创华尔街纪录",
+      "narrative": "美林的 CDO 敞口是华尔街最大的。连续两个季度巨亏之后，市场开始认真讨论「美林还能不能独立活下去」。",
+      "window": [
+        "2008-01-01",
+        "2008-03-15"
+      ],
+      "requires": [
+        "merrill_writedown_8b"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.14
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "MER",
+          "financials"
+        ],
+        "equityReturn": -0.1,
+        "indexReturn": -0.018,
+        "volMultiplier": 1.5,
+        "creditSpreadDelta": 85,
+        "liquidityMultiplier": 0.72,
+        "repoHaircutDelta": 0.05,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "MER": 0.15,
+        "LEH": 0.05,
+        "BSC": 0.05,
+        "all_financials": 0.05
+      },
+      "unlocks": [
+        "global_equity_selloff_jan2008"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美林财报"
+      ]
+    },
+    {
+      "id": "global_equity_selloff_jan2008",
+      "phase": 2,
+      "date": "2008-01-21",
+      "title": "全球股灾",
+      "headline": "亚太与欧洲股市暴跌，恒指单日跌 5.5%，日经跌 3.9%",
+      "narrative": "表面导火索是法国兴业银行的交易员欺诈案，实质是市场终于承认美国信贷问题会波及全球。**注意：这次暴跌与次贷本身无关，但被市场当成了次贷的后果。**",
+      "window": [
+        "2008-01-15",
+        "2008-02-15"
+      ],
+      "requires": [
+        "citigroup_writedown_18b"
+      ],
+      "requireAnyOf": [
+        [
+          "merrill_writedown_14b"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.25
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.04,
+        "indexReturn": -0.055,
+        "volMultiplier": 1.6,
+        "creditSpreadDelta": 70,
+        "liquidityMultiplier": 0.55,
+        "repoHaircutDelta": 0.05,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "all_financials": 0.08,
+        "BSC": 0.08,
+        "LEH": 0.06
+      },
+      "unlocks": [
+        "fed_emergency_cut_75bp"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "市场数据"
+      ]
+    },
+    {
+      "id": "fed_emergency_cut_75bp",
+      "phase": 2,
+      "date": "2008-01-22",
+      "title": "美联储紧急降息 75 个基点",
+      "headline": "美联储在开盘前紧急宣布降息 75bp 至 3.5%，为 1984 年以来最大单次降幅",
+      "narrative": "在非会议日、开盘前紧急降息——这是极罕见的动作。市场短暂止跌，但这次降息之后的八个月里，一切都变得更糟。",
+      "window": [
+        "2008-01-18",
+        "2008-02-15"
+      ],
+      "requires": [
+        "global_equity_selloff_jan2008"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.4
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.01,
+        "indexReturn": 0.012,
+        "volMultiplier": 0.88,
+        "creditSpreadDelta": -30,
+        "liquidityMultiplier": 1.25,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 12
+      },
+      "affectsFragility": {
+        "all_financials": -0.04
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "carlyle_capital_default",
+      "phase": 2,
+      "date": "2008-03-06",
+      "title": "凯雷资本违约",
+      "headline": "凯雷资本基金未能满足 4 亿美元追加保证金，濒临清算",
+      "narrative": "又一个高杠杆结构化信贷基金归零。这一次市场反应温和——因为大家以为「只有基金有问题，不是银行」。",
+      "window": [
+        "2008-02-01",
+        "2008-03-31"
+      ],
+      "requires": [
+        "monoline_crisis"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "macro",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "financials"
+        ],
+        "equityReturn": -0.03,
+        "indexReturn": -0.008,
+        "volMultiplier": 1.25,
+        "creditSpreadDelta": 60,
+        "liquidityMultiplier": 0.8,
+        "repoHaircutDelta": 0.04,
+        "decayDays": 8
+      },
+      "affectsFragility": {
+        "BSC": 0.1,
+        "LEH": 0.06,
+        "all_financials": 0.04
+      },
+      "unlocks": [
+        "fed_tslf_announced",
+        "bear_stearns_liquidity_crisis"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "fed_tslf_announced",
+      "phase": 2,
+      "date": "2008-03-11",
+      "title": "美联储推出定期证券借贷工具（TSLF）",
+      "headline": "美联储宣布向一级交易商出借 2000 亿美元国债，接受 MBS 作为抵押",
+      "narrative": "美联储开始接受垃圾抵押品换取国债——这是央行历史上罕见的一次角色转变：从最后贷款人变成最后的做市商。",
+      "window": [
+        "2008-03-05",
+        "2008-03-20"
+      ],
+      "requires": [
+        "carlyle_capital_default"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.35
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.02,
+        "indexReturn": 0.02,
+        "volMultiplier": 0.85,
+        "creditSpreadDelta": -25,
+        "liquidityMultiplier": 1.3,
+        "repoHaircutDelta": -0.03,
+        "decayDays": 6
+      },
+      "affectsFragility": {
+        "BSC": -0.03,
+        "all_financials": -0.03
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "bear_stearns_liquidity_crisis",
+      "phase": 2,
+      "date": "2008-03-13",
+      "title": "贝尔斯登流动性彻底枯竭",
+      "headline": "贝尔斯登告知美联储与财政部：公司将于次日无法履行义务",
+      "narrative": "一夜之间，回购市场对贝尔斯登关闭。它的资产还在（名义上有 3950 亿美元），但它无法在今天融到明天的钱。**这就是「融不到资」的全部含义。**",
+      "window": [
+        "2008-03-05",
+        "2008-03-20"
+      ],
+      "requires": [
+        "repo_funding_stress"
+      ],
+      "requireAnyOf": [
+        [
+          "carlyle_capital_default"
+        ]
+      ],
+      "trigger": {
+        "type": "competing_risk",
+        "institution": "BSC",
+        "baseHazard": 0.05,
+        "note": "贝尔斯登的脆弱度在 2008-03 达到全表最高。若玩家未干预，它在此处倒下的概率约 62%。"
+      },
+      "tier": "investment_bank",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "BSC",
+          "financials"
+        ],
+        "equityReturn": -0.47,
+        "indexReturn": -0.013,
+        "volMultiplier": 1.55,
+        "creditSpreadDelta": 130,
+        "liquidityMultiplier": 0.4,
+        "repoHaircutDelta": 0.12,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "BSC": 0.25,
+        "LEH": 0.12,
+        "MER": 0.1,
+        "GS": 0.06,
+        "MS": 0.06,
+        "all_financials": 0.1
+      },
+      "unlocks": [
+        "bear_stearns_collapse"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report",
+        "Valukas 报告背景"
+      ]
+    },
+    {
+      "id": "bear_stearns_collapse",
+      "phase": 2,
+      "date": "2008-03-16",
+      "title": "贝尔斯登被摩根大通收购",
+      "headline": "摩根大通以每股 2 美元收购贝尔斯登，美联储提供 290 亿美元backstop",
+      "narrative": "五家独立投行中的第一家倒下。**每股 2 美元——一年前它的股价是 170 美元。** 美联储为这笔交易提供了 290 亿美元的支持，这是央行第一次为一家投资银行的私有并购兜底。\n\n它先倒的原因不是随机：五家中它规模最小、杠杆最高（33 倍）、回购融资依赖最重（占负债 32%）。最小的那一个，被最先推倒。",
+      "window": [
+        "2008-03-10",
+        "2008-04-30"
+      ],
+      "requires": [
+        "repo_funding_stress"
+      ],
+      "requireAnyOf": [
+        [
+          "bear_stearns_liquidity_crisis"
+        ],
+        [
+          "carlyle_capital_default"
+        ]
+      ],
+      "trigger": {
+        "type": "competing_risk",
+        "institution": "BSC",
+        "baseHazard": 0.12,
+        "canonicalFirstDomino": true,
+        "note": "本事件是历史路径上「第一个倒下的投行」。在 competing_risk 模型下，它并非强制第一——LEH / MER 等也可能先触发。见 docs/05。"
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "terminalFailure": [
+        "BSC"
+      ],
+      "impact": {
+        "targets": [
+          "BSC",
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.9,
+        "indexReturn": -0.011,
+        "volMultiplier": 1.7,
+        "creditSpreadDelta": 150,
+        "liquidityMultiplier": 0.35,
+        "repoHaircutDelta": 0.1,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "LEH": 0.18,
+        "MER": 0.14,
+        "GS": 0.08,
+        "MS": 0.08,
+        "AIG": 0.06,
+        "all_financials": 0.14
+      },
+      "unlocks": [
+        "lehman_contagion"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "lehman_contagion",
+      "phase": 2,
+      "date": "2008-03-17",
+      "title": "雷曼成为下一个目标",
+      "headline": "雷曼兄弟股价单日暴跌 19%，市场开始寻找下一个贝尔斯登",
+      "narrative": "贝尔斯登倒下后，市场立刻开始做空「下一个最脆弱的」。雷曼的信用利差一天内扩大一倍。**玩家在此刻会看到一个残酷的规律：上一家的尸体，是下一家的路标。**",
+      "window": [
+        "2008-03-16",
+        "2008-05-31"
+      ],
+      "requires": [
+        "bear_stearns_collapse"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "LEH",
+          "financials"
+        ],
+        "equityReturn": -0.19,
+        "indexReturn": -0.015,
+        "volMultiplier": 1.4,
+        "creditSpreadDelta": 90,
+        "liquidityMultiplier": 0.55,
+        "repoHaircutDelta": 0.06,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "LEH": 0.16,
+        "MER": 0.08,
+        "GS": 0.05,
+        "MS": 0.05
+      },
+      "unlocks": [
+        "fed_cut_to_2pct"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "市场数据"
+      ]
+    },
+    {
+      "id": "fed_cut_to_2pct",
+      "phase": 2,
+      "date": "2008-04-30",
+      "title": "美联储降息至 2% 并暗示暂停",
+      "headline": "美联储降息 25bp 至 2.0%，声明中删除了「下行风险」表述",
+      "narrative": "市场把这次降息解读为「美联储认为危机结束了」。股指在 5 月一度反弹，VIX 回落到 20 以下。**又一个陷阱：政策转向被误读为危机结束。**",
+      "window": [
+        "2008-04-01",
+        "2008-06-15"
+      ],
+      "requires": [
+        "lehman_contagion"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.01,
+        "indexReturn": 0.008,
+        "volMultiplier": 0.78,
+        "creditSpreadDelta": -20,
+        "liquidityMultiplier": 1.3,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 25
+      },
+      "affectsFragility": {
+        "all_financials": -0.05
+      },
+      "unlocks": [
+        "false_calm_summer2008"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "false_calm_summer2008",
+      "phase": 2,
+      "date": "2008-05-15",
+      "title": "「危机最坏的时期已经过去」",
+      "headline": "多家投行 CEO 公开表示信贷危机已接近尾声，标普 500 自 3 月低点反弹 12%",
+      "narrative": "六个月前贝尔斯登倒下时所有人都在恐慌；现在所有人都认为事情结束了。\n\n**只有在事后才知道：这是雷曼倒下前最后的平静。** 玩家如果在这里做多，将在四个月后被彻底清算。",
+      "window": [
+        "2008-05-01",
+        "2008-08-15"
+      ],
+      "requires": [
+        "fed_cut_to_2pct"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.06
+      },
+      "tier": "macro",
+      "reversible": true,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [],
+        "equityReturn": 0,
+        "indexReturn": 0.005,
+        "volMultiplier": 0.72,
+        "creditSpreadDelta": -15,
+        "liquidityMultiplier": 1.25,
+        "repoHaircutDelta": 0,
+        "decayDays": 45
+      },
+      "affectsFragility": {
+        "all_financials": -0.07
+      },
+      "unlocks": [
+        "lehman_q2_loss"
+      ],
+      "newsVisibility": 0,
+      "isTrap": true,
+      "trapNote": "本作设计中的第二个大陷阱，比 2007-10 更危险——因为这次连 VIX 都回到了正常水平。真正的信号（回购折扣率、ABCP 市场）依然在恶化，但那些不在 D0 玩家的视野里。",
+      "sources": [
+        "公开讲话记录",
+        "市场数据"
+      ]
+    },
+    {
+      "id": "lehman_q2_loss",
+      "phase": 3,
+      "date": "2008-06-09",
+      "title": "雷曼宣布 28 亿美元季度亏损",
+      "headline": "雷曼兄弟二季度亏损 28 亿美元，同时宣布募资 60 亿美元",
+      "narrative": "雷曼第一次公开承认巨额亏损。市场用暴跌回应——股价单日跌 8.7%，盘后再跌。",
+      "window": [
+        "2008-06-01",
+        "2008-07-31"
+      ],
+      "requires": [
+        "false_calm_summer2008"
+      ],
+      "requireAnyOf": [
+        [
+          "lehman_contagion"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "LEH",
+          "financials"
+        ],
+        "equityReturn": -0.09,
+        "indexReturn": -0.011,
+        "volMultiplier": 1.35,
+        "creditSpreadDelta": 80,
+        "liquidityMultiplier": 0.65,
+        "repoHaircutDelta": 0.05,
+        "decayDays": 18
+      },
+      "affectsFragility": {
+        "LEH": 0.16,
+        "MER": 0.06,
+        "GS": 0.05,
+        "MS": 0.05,
+        "all_financials": 0.05
+      },
+      "unlocks": [
+        "indymac_failure"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "雷曼财报",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "indymac_failure",
+      "phase": 3,
+      "date": "2008-07-11",
+      "title": "IndyMac 银行被接管",
+      "headline": "FDIC 接管 IndyMac，成为美国史上第二大银行倒闭案",
+      "narrative": "参议员在公开信中说 IndyMac「可能无法生存」，11 天内储户取走 13 亿美元。**一句公开言论杀死了一家银行。** 信心可以在一句话之间消失——这是玩家必须理解的事。",
+      "window": [
+        "2008-06-15",
+        "2008-08-31"
+      ],
+      "requires": [
+        "lehman_q2_loss"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "commercial_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "terminalFailure": [
+        "IMB"
+      ],
+      "impact": {
+        "targets": [
+          "IMB",
+          "WM",
+          "WB",
+          "financials"
+        ],
+        "equityReturn": -0.85,
+        "indexReturn": -0.017,
+        "volMultiplier": 1.5,
+        "creditSpreadDelta": 95,
+        "liquidityMultiplier": 0.58,
+        "repoHaircutDelta": 0.06,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "IMB": -0.9,
+        "WM": 0.15,
+        "WB": 0.12,
+        "CFC": 0.05,
+        "FNM": 0.1,
+        "FRE": 0.1
+      },
+      "unlocks": [
+        "treasury_gse_backstop"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FDIC",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "treasury_gse_backstop",
+      "phase": 3,
+      "date": "2008-07-13",
+      "title": "财政部为两房提供救助方案",
+      "headline": "财政部与美联储宣布支持房利美与房地美，包括提高信贷额度与潜在注资",
+      "narrative": "政府明确表示不会让两房倒下。市场反弹一天，随后继续下跌——**因为「政府会救」这件事，本身就是一个坏消息。**",
+      "window": [
+        "2008-07-05",
+        "2008-08-15"
+      ],
+      "requires": [
+        "indymac_failure"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "FNM",
+          "FRE",
+          "financials"
+        ],
+        "equityReturn": 0.1,
+        "indexReturn": 0.006,
+        "volMultiplier": 0.88,
+        "creditSpreadDelta": -20,
+        "liquidityMultiplier": 1.2,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 12
+      },
+      "affectsFragility": {
+        "FNM": -0.06,
+        "FRE": -0.06
+      },
+      "unlocks": [
+        "housing_recovery_act",
+        "gse_conservatorship"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "财政部公告"
+      ]
+    },
+    {
+      "id": "housing_recovery_act",
+      "phase": 3,
+      "date": "2008-07-30",
+      "title": "《住房与经济复苏法案》签署生效",
+      "headline": "布什签署法案，授权财政部为两房提供无限额信贷支持并设立 FHFA",
+      "narrative": "法案给了财政部一张空白支票。它同时设立了新的监管机构 FHFA——**这个机构在 39 天后将接管两房。**",
+      "window": [
+        "2008-07-15",
+        "2008-09-01"
+      ],
+      "requires": [
+        "treasury_gse_backstop"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "equityReturn": 0,
+        "indexReturn": 0.004,
+        "volMultiplier": 0.95,
+        "creditSpreadDelta": -10,
+        "liquidityMultiplier": 1.1,
+        "repoHaircutDelta": 0,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "FNM": -0.04,
+        "FRE": -0.04
+      },
+      "unlocks": [
+        "gse_conservatorship"
+      ],
+      "newsVisibility": 1,
+      "sources": [
+        "国会立法记录"
+      ]
+    },
+    {
+      "id": "gse_conservatorship",
+      "phase": 3,
+      "date": "2008-09-07",
+      "title": "两房被政府接管",
+      "headline": "FHFA 接管房利美与房地美，CEO 被撤换，股东权益基本归零",
+      "narrative": "两家担保了全美约一半房贷、合计 5.4 万亿美元资产的机构被政府接管。优先股股东几乎血本无归，普通股归零。\n\n**注意：这是政策决定，不是市场决定。** 它们的倒台时点由财政部的政治意愿驱动，不由市场流动性驱动——所以在这个游戏里，两房的排序自由度显著低于投行。",
+      "window": [
+        "2008-08-20",
+        "2008-09-30"
+      ],
+      "requires": [
+        "housing_recovery_act",
+        "subprime_delinquency_rise"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.15,
+        "note": "受 tier=gse 约束，不可早于任何投行/银行层失败事件"
+      },
+      "tier": "gse",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "terminalFailure": [
+        "FNM",
+        "FRE"
+      ],
+      "impact": {
+        "targets": [
+          "FNM",
+          "FRE",
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.85,
+        "indexReturn": 0.004,
+        "volMultiplier": 1.3,
+        "creditSpreadDelta": 85,
+        "liquidityMultiplier": 0.6,
+        "repoHaircutDelta": 0.08,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "FNM": -1.0,
+        "FRE": -1.0,
+        "LEH": 0.14,
+        "MER": 0.1,
+        "AIG": 0.12,
+        "C": 0.08,
+        "all_financials": 0.1
+      },
+      "unlocks": [
+        "lehman_stock_collapse"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FHFA 公告",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "lehman_stock_collapse",
+      "phase": 3,
+      "date": "2008-09-09",
+      "title": "雷曼股价单日暴跌 45%",
+      "headline": "雷曼兄弟股价暴跌 45%，韩国产业银行收购谈判破裂",
+      "narrative": "最后的救援希望破灭。雷曼的信用利差扩大到 800bp 以上——市场在说：这家公司不会活过这个月。",
+      "window": [
+        "2008-09-01",
+        "2008-09-14"
+      ],
+      "requires": [
+        "gse_conservatorship"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.35
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "LEH",
+          "financials"
+        ],
+        "equityReturn": -0.45,
+        "indexReturn": -0.034,
+        "volMultiplier": 1.6,
+        "creditSpreadDelta": 180,
+        "liquidityMultiplier": 0.4,
+        "repoHaircutDelta": 0.1,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "LEH": 0.3,
+        "MER": 0.15,
+        "AIG": 0.15,
+        "GS": 0.08,
+        "MS": 0.08,
+        "all_financials": 0.12
+      },
+      "unlocks": [
+        "lehman_weekend_negotiation"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "市场数据"
+      ]
+    },
+    {
+      "id": "lehman_weekend_negotiation",
+      "phase": 3,
+      "date": "2008-09-13",
+      "title": "纽约联储周末紧急谈判",
+      "headline": "华尔街各大机构 CEO 与监管者在纽约联储闭门谈判，讨论雷曼的命运",
+      "narrative": "整个周末，华尔街头面人物被关在纽约联储的大楼里。巴克莱在最后时刻退出，因为英国监管机构拒绝批准。\n\n**玩家应该能感到：这个周末之后，一切都会不同。**",
+      "window": [
+        "2008-09-10",
+        "2008-09-14"
+      ],
+      "requires": [
+        "lehman_stock_collapse"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.5
+      },
+      "tier": "investment_bank",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "LEH",
+          "financials"
+        ],
+        "equityReturn": -0.1,
+        "indexReturn": 0.004,
+        "volMultiplier": 1.35,
+        "creditSpreadDelta": 90,
+        "liquidityMultiplier": 0.5,
+        "repoHaircutDelta": 0.06,
+        "decayDays": 4
+      },
+      "affectsFragility": {
+        "LEH": 0.1,
+        "MER": 0.12,
+        "AIG": 0.1
+      },
+      "unlocks": [
+        "merrill_merger",
+        "lehman_collapse",
+        "lehman_rescue_variant"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "lehman_rescue_variant",
+      "phase": 3,
+      "date": "2008-09-14",
+      "title": "【平行时间线】雷曼获得救助",
+      "headline": "巴克莱获英国监管批准，收购雷曼兄弟核心业务",
+      "narrative": "在这个时间线里，英国监管机构批准了交易，或者美联储决定提供支持。雷曼活了下来。\n\n**市场暴涨。所有做空的人在这一天亏掉一年利润。** 这是 parallel 模式下最重要的变体事件——它存在的意义是让「无脑做空」不再是一个安全策略。",
+      "window": [
+        "2008-09-13",
+        "2008-09-15"
+      ],
+      "requires": [
+        "lehman_stock_collapse"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.18,
+        "modeOnly": "parallel"
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": false,
+      "exclusiveWith": [
+        "lehman_collapse"
+      ],
+      "impact": {
+        "targets": [
+          "LEH",
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 1.2,
+        "indexReturn": 0.055,
+        "volMultiplier": 0.55,
+        "creditSpreadDelta": -250,
+        "liquidityMultiplier": 1.8,
+        "repoHaircutDelta": -0.12,
+        "decayDays": 40
+      },
+      "affectsFragility": {
+        "LEH": -0.35,
+        "MER": -0.15,
+        "AIG": -0.15,
+        "all_financials": -0.2
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "designNote": "仅 parallel 模式启用。它的存在让玩家无法确定雷曼一定会倒——这正是随机扰动的意义所在。",
+      "sources": [
+        "历史反事实推演"
+      ]
+    },
+    {
+      "id": "merrill_merger",
+      "phase": 3,
+      "date": "2008-09-14",
+      "title": "美林被美国银行收购",
+      "headline": "美国银行以 500 亿美元收购美林，避免其成为第二个雷曼",
+      "narrative": "同一个周末，美林选择了出售而不是等待。它的 CEO 后来承认：如果晚一天，美林就是第二个雷曼。\n\n**这是「主动认输」和「被动死亡」的分界线。**",
+      "window": [
+        "2008-09-13",
+        "2008-09-16"
+      ],
+      "requires": [
+        "lehman_weekend_negotiation"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.45
+      },
+      "tier": "investment_bank",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "terminalFailure": [
+        "MER"
+      ],
+      "impact": {
+        "targets": [
+          "MER",
+          "BAC",
+          "financials"
+        ],
+        "equityReturn": -0.2,
+        "indexReturn": -0.005,
+        "volMultiplier": 1.25,
+        "creditSpreadDelta": 60,
+        "liquidityMultiplier": 0.6,
+        "repoHaircutDelta": 0.05,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "MER": -0.6,
+        "BAC": 0.12,
+        "LEH": 0.08,
+        "GS": 0.05,
+        "MS": 0.05
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "并购公告"
+      ]
+    },
+    {
+      "id": "lehman_collapse",
+      "phase": 3,
+      "date": "2008-09-15",
+      "title": "雷曼兄弟申请破产保护",
+      "headline": "雷曼兄弟申请第 11 章破产保护，6390 亿美元资产——美国史上最大破产案",
+      "narrative": "雷曼兄弟倒下了，而这一次美联储没有救。\n\n6390 亿美元的资产、2.5 万名员工、遍布全球的交易对手。它的破产让货币市场基金跌破面值、商业票据市场冻结、全球银行间市场彻底停摆。\n\n**这是整场危机的中心。玩家此后所有的决策，都在这个事件的余波里。**\n\n历史台词：「我们决定不救雷曼。」——而这个决定的原因，至今仍有争议。",
+      "window": [
+        "2008-09-12",
+        "2008-09-20"
+      ],
+      "requires": [
+        "housing_downturn",
+        "subprime_delinquency_rise",
+        "repo_funding_stress",
+        "gse_conservatorship"
+      ],
+      "requireAnyOf": [
+        [
+          "bear_stearns_collapse"
+        ],
+        [
+          "merrill_merger"
+        ],
+        [
+          "gse_conservatorship"
+        ],
+        [
+          "credit_spread_above_800"
+        ],
+        [
+          "player_short_concentration_LEH_above_5pct"
+        ]
+      ],
+      "trigger": {
+        "type": "competing_risk",
+        "institution": "LEH",
+        "baseHazard": 0.06,
+        "note": "在历史参数下多数运行中由窗口内的竞争风险触发。若玩家大幅做空 LEH，其脆弱度上升会显著提前并提高触发概率——玩家可以亲手促成雷曼先倒。"
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "terminalFailure": [
+        "LEH"
+      ],
+      "impact": {
+        "targets": [
+          "LEH",
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.94,
+        "indexReturn": -0.047,
+        "volMultiplier": 2.1,
+        "creditSpreadDelta": 320,
+        "liquidityMultiplier": 0.15,
+        "repoHaircutDelta": 0.2,
+        "decayDays": 45
+      },
+      "affectsFragility": {
+        "LEH": -1.0,
+        "AIG": 0.35,
+        "MER": 0.2,
+        "GS": 0.15,
+        "MS": 0.15,
+        "C": 0.12,
+        "all_financials": 0.22
+      },
+      "unlocks": [
+        "aig_bailout",
+        "reserve_primary_breaks_buck",
+        "money_market_run",
+        "sec_short_ban",
+        "gs_ms_bank_holding"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "破产申请",
+        "FCIC Report",
+        "Valukas 报告"
+      ]
+    },
+    {
+      "id": "reserve_primary_breaks_buck",
+      "phase": 3,
+      "date": "2008-09-16",
+      "title": "Reserve Primary Fund 跌破 1 美元",
+      "headline": "美国历史最悠久的货币市场基金净值跌至 0.97 美元，因持有雷曼商业票据",
+      "narrative": "「跌破面值」（breaking the buck）——货币市场基金被视为等同于现金，从未发生过这种事。\n\n它持有 7.85 亿美元雷曼商业票据，一夜之间归零。**第二天，投资者从货币基金撤走了 3000 亿美元。**\n\n这是整场危机中最快的一次挤兑，也是最被低估的一次。",
+      "window": [
+        "2008-09-15",
+        "2008-09-20"
+      ],
+      "requires": [
+        "lehman_collapse"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.6
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.02,
+        "indexReturn": -0.018,
+        "volMultiplier": 1.75,
+        "creditSpreadDelta": 250,
+        "liquidityMultiplier": 0.12,
+        "repoHaircutDelta": 0.18,
+        "decayDays": 30
+      },
+      "affectsFragility": {
+        "all_financials": 0.15,
+        "AIG": 0.15,
+        "C": 0.1,
+        "GS": 0.1,
+        "MS": 0.12
+      },
+      "unlocks": [
+        "money_market_run"
+      ],
+      "newsVisibility": 0,
+      "structural": true,
+      "sources": [
+        "SEC 文件",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "money_market_run",
+      "phase": 3,
+      "date": "2008-09-17",
+      "title": "货币市场基金全面挤兑",
+      "headline": "一周内 3000 亿美元撤离货币市场基金，商业票据市场停止运转",
+      "narrative": "货币基金是企业短期融资的主要买家。它们一撤，全球的企业——不只是银行——都无法滚动短期债务。\n\n**危机从华尔街扩散到了实体经济，就在这一周。**",
+      "window": [
+        "2008-09-16",
+        "2008-10-15"
+      ],
+      "requires": [
+        "reserve_primary_breaks_buck"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "state",
+        "predicate": "liquidityMultiplier < 0.35"
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.045,
+        "volMultiplier": 1.6,
+        "creditSpreadDelta": 200,
+        "liquidityMultiplier": 0.25,
+        "repoHaircutDelta": 0.15,
+        "decayDays": 40
+      },
+      "affectsFragility": {
+        "all_financials": 0.1,
+        "AIG": 0.1
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "structural": true,
+      "sources": [
+        "ICI 数据",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "aig_bailout",
+      "phase": 3,
+      "date": "2008-09-16",
+      "title": "AIG 被美联储救助 850 亿美元",
+      "headline": "美联储向 AIG 提供 850 亿美元紧急贷款，接管其 79.9% 股权",
+      "narrative": "AIG 的杠杆率只有 11 倍——按传统标准它「不危险」。但它卖出了 4400 亿美元名义额的 CDS 保护，为全球金融机构的次贷敞口承保。\n\n雷曼倒下后，所有买了 AIG 保护的人都意识到：**他们的保险可能赔付不了。** 于是所有人都要求 AIG 追加抵押品——而 AIG 拿不出来。\n\n**这一课是：不是你判断错了，是你在正确的时候被融资断了。** 债务保险的卖方，本质上是在卖出尾部风险。",
+      "window": [
+        "2008-09-14",
+        "2008-09-20"
+      ],
+      "requires": [
+        "lehman_collapse"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.65
+      },
+      "tier": "insurer",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "AIG",
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.6,
+        "indexReturn": -0.018,
+        "volMultiplier": 1.55,
+        "creditSpreadDelta": 260,
+        "liquidityMultiplier": 0.2,
+        "repoHaircutDelta": 0.15,
+        "decayDays": 35
+      },
+      "affectsFragility": {
+        "AIG": -0.2,
+        "GS": 0.05,
+        "MS": 0.05,
+        "all_financials": 0.1
+      },
+      "unlocks": [
+        "aig_second_bailout",
+        "counterparty_crisis"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "counterparty_crisis",
+      "phase": 3,
+      "date": "2008-09-17",
+      "title": "对手方风险全面浮现",
+      "headline": "机构之间互相冻结授信，Libor-OIS 利差飙升至 200bp 以上",
+      "narrative": "每个机构都在问同一个问题：**我的交易对手明天还活着吗？**\n\n当没有人愿意借钱给任何人的时候，市场就停止运转了。这不是价格问题，是信任问题。",
+      "window": [
+        "2008-09-16",
+        "2008-10-30"
+      ],
+      "requires": [
+        "aig_bailout"
+      ],
+      "requireAnyOf": [
+        [
+          "money_market_run"
+        ]
+      ],
+      "trigger": {
+        "type": "state",
+        "predicate": "tedSpread > 2.6"
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.03,
+        "volMultiplier": 1.5,
+        "creditSpreadDelta": 180,
+        "liquidityMultiplier": 0.18,
+        "repoHaircutDelta": 0.2,
+        "decayDays": 60
+      },
+      "affectsFragility": {
+        "all_financials": 0.12,
+        "GS": 0.1,
+        "MS": 0.12
+      },
+      "unlocks": [
+        "sec_short_ban",
+        "gs_ms_bank_holding"
+      ],
+      "newsVisibility": 1,
+      "structural": true,
+      "sources": [
+        "TED 利差",
+        "Libor-OIS"
+      ]
+    },
+    {
+      "id": "sec_short_ban",
+      "phase": 3,
+      "date": "2008-09-19",
+      "title": "SEC 紧急禁止做空金融股",
+      "headline": "SEC 发布紧急命令，禁止对 799 只金融股进行卖空，有效期至 10 月 8 日",
+      "narrative": "监管者认定做空者在攻击金融机构。禁令覆盖 799 只股票，全球多国同步跟进。\n\n**对玩家来说，这可能是游戏里最重要的一天：如果你的策略是做空金融股，你的核心策略在一夜之间被法律禁止了。**\n\n如果你是多头，这条禁令反而保护了你。监管从来不是只朝一个方向的。",
+      "window": [
+        "2008-09-17",
+        "2008-09-25"
+      ],
+      "requires": [
+        "lehman_collapse"
+      ],
+      "requireAnyOf": [
+        [
+          "counterparty_crisis"
+        ],
+        [
+          "money_market_run"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.55
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "imposesRule": {
+        "kind": "short_ban",
+        "scope": [
+          "financials"
+        ],
+        "durationDays": 19,
+        "note": "历史：2008-09-19 至 2008-10-08，共 799 只金融股"
+      },
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.12,
+        "indexReturn": 0.04,
+        "volMultiplier": 0.8,
+        "creditSpreadDelta": -80,
+        "liquidityMultiplier": 1.5,
+        "repoHaircutDelta": -0.05,
+        "decayDays": 12
+      },
+      "affectsFragility": {
+        "all_financials": -0.08,
+        "GS": -0.05,
+        "MS": -0.05
+      },
+      "unlocks": [
+        "gs_ms_bank_holding"
+      ],
+      "newsVisibility": 0,
+      "designNote": "这是本作对做空策略最强的反制机制。它同时是正面的（多头被保护）和负面的（空头被锁死），而且它由玩家的 SRS 加市场状态共同驱动——高 SRS 玩家会更容易遇到它。",
+      "sources": [
+        "SEC 紧急命令",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "gs_ms_bank_holding",
+      "phase": 3,
+      "date": "2008-09-21",
+      "title": "高盛与摩根士丹利转为银行控股公司",
+      "headline": "美联储批准高盛与摩根士丹利转为银行控股公司，独立投行模式终结",
+      "narrative": "最后两家独立投行主动放弃了独立投行的身份，以换取美联储的永久流动性支持与存款融资渠道。\n\n**华尔街五大投行——贝尔斯登、雷曼、美林、高盛、摩根士丹利——在六个月里全部消失。** 一个延续了 75 年的商业模式就此终结。",
+      "window": [
+        "2008-09-19",
+        "2008-10-05"
+      ],
+      "requires": [
+        "lehman_collapse"
+      ],
+      "requireAnyOf": [
+        [
+          "sec_short_ban"
+        ],
+        [
+          "counterparty_crisis"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.3
+      },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "GS",
+          "MS",
+          "financials"
+        ],
+        "equityReturn": -0.1,
+        "indexReturn": -0.039,
+        "volMultiplier": 1.45,
+        "creditSpreadDelta": 120,
+        "liquidityMultiplier": 0.35,
+        "repoHaircutDelta": 0.1,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "GS": -0.1,
+        "MS": -0.1,
+        "all_financials": 0.05
+      },
+      "unlocks": [
+        "wamu_seized"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告"
+      ]
+    },
+    {
+      "id": "wamu_seized",
+      "phase": 4,
+      "date": "2008-09-25",
+      "title": "华盛顿互惠银行被接管",
+      "headline": "FDIC 接管华盛顿互惠银行，将其银行资产以 19 亿美元出售给摩根大通",
+      "narrative": "美国史上最大的银行倒闭案。9 天内储户取走 167 亿美元，最终以 19 亿美元的价格出售——**不到其两个月前市值的 2%。**",
+      "window": [
+        "2008-09-20",
+        "2008-10-15"
+      ],
+      "requires": [
+        "gs_ms_bank_holding"
+      ],
+      "requireAnyOf": [
+        [
+          "indymac_failure"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.3
+      },
+      "tier": "commercial_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "terminalFailure": [
+        "WM"
+      ],
+      "impact": {
+        "targets": [
+          "WM",
+          "financials"
+        ],
+        "equityReturn": -0.9,
+        "indexReturn": -0.008,
+        "volMultiplier": 1.3,
+        "creditSpreadDelta": 90,
+        "liquidityMultiplier": 0.45,
+        "repoHaircutDelta": 0.08,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "WM": -1.0,
+        "WB": 0.18,
+        "C": 0.08,
+        "all_financials": 0.07
+      },
+      "unlocks": [
+        "wachovia_deal",
+        "tarp_vote_fails"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FDIC"
+      ]
+    },
+    {
+      "id": "wachovia_deal",
+      "phase": 4,
+      "date": "2008-09-29",
+      "title": "瓦乔维亚被花旗收购",
+      "headline": "花旗在 FDIC 协助下以 22 亿美元收购瓦乔维亚银行控股业务",
+      "narrative": "又一家在房价顶点完成致命收购的银行倒下。Wachovia 在 2006 年买下 Golden West——全美最大的可调利率房贷机构——就在市场见顶的前几个月。",
+      "window": [
+        "2008-09-25",
+        "2008-10-15"
+      ],
+      "requires": [
+        "wamu_seized"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.35
+      },
+      "tier": "commercial_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "WB",
+          "C",
+          "financials"
+        ],
+        "equityReturn": -0.82,
+        "indexReturn": -0.008,
+        "volMultiplier": 1.28,
+        "creditSpreadDelta": 85,
+        "liquidityMultiplier": 0.45,
+        "repoHaircutDelta": 0.08,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "WB": -1.0,
+        "C": 0.1,
+        "all_financials": 0.06
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "FDIC",
+        "并购公告"
+      ]
+    },
+    {
+      "id": "tarp_vote_fails",
+      "phase": 4,
+      "date": "2008-09-29",
+      "title": "众议院否决 TARP 救助法案",
+      "headline": "众议院以 228 票对 205 票否决 7000 亿美元救助计划，道指暴跌 777 点",
+      "narrative": "史上最大的单日点数跌幅。议员们在投票后才发现市场崩了——**政治程序与市场时间尺度的错配，本身就是一个风险源。**\n\n玩家如果在做多，这一天会非常难受；如果在做空，这是全年最好的一天。",
+      "window": [
+        "2008-09-25",
+        "2008-10-02"
+      ],
+      "requires": [
+        "lehman_collapse"
+      ],
+      "requireAnyOf": [
+        [
+          "wamu_seized"
+        ],
+        [
+          "counterparty_crisis"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.4
+      },
+      "tier": "policy",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.15,
+        "indexReturn": -0.088,
+        "volMultiplier": 1.75,
+        "creditSpreadDelta": 220,
+        "liquidityMultiplier": 0.2,
+        "repoHaircutDelta": 0.18,
+        "decayDays": 6
+      },
+      "affectsFragility": {
+        "all_financials": 0.12,
+        "C": 0.1,
+        "GS": 0.08,
+        "MS": 0.1
+      },
+      "unlocks": [
+        "tarp_passed"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "国会投票记录"
+      ]
+    },
+    {
+      "id": "tarp_passed",
+      "phase": 4,
+      "date": "2008-10-03",
+      "title": "TARP 救助法案通过",
+      "headline": "众议院以 263 票对 171 票通过 7000 亿美元问题资产救助计划",
+      "narrative": "法案通过了，市场却下跌了 1.4%。**「好消息出尽」——政策落地的那一刻，反弹的理由也就消失了。**",
+      "window": [
+        "2008-09-30",
+        "2008-10-10"
+      ],
+      "requires": [
+        "tarp_vote_fails"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.55
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.01,
+        "indexReturn": -0.014,
+        "volMultiplier": 1.1,
+        "creditSpreadDelta": -20,
+        "liquidityMultiplier": 1.15,
+        "repoHaircutDelta": -0.03,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "all_financials": -0.04
+      },
+      "unlocks": [
+        "global_meltdown_oct"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "国会投票记录"
+      ]
+    },
+    {
+      "id": "global_meltdown_oct",
+      "phase": 4,
+      "date": "2008-10-15",
+      "title": "全球市场崩盘",
+      "headline": "标普 500 单日下跌 9%，为 1987 年以来最惨烈的一天",
+      "narrative": "这一周全球股市蒸发了数万亿美元。所有资产同时下跌——**股票、公司债、大宗商品、新兴市场，全部一起。**\n\n如果你的组合是「分散化」的，这一周你会发现它一点都不分散。相关性趋近于 1，这是危机的物理特征，不是模型误差。",
+      "window": [
+        "2008-10-01",
+        "2008-10-31"
+      ],
+      "requires": [
+        "tarp_passed"
+      ],
+      "requireAnyOf": [
+        [
+          "counterparty_crisis"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": -0.18,
+        "indexReturn": -0.09,
+        "volMultiplier": 1.85,
+        "creditSpreadDelta": 300,
+        "liquidityMultiplier": 0.1,
+        "repoHaircutDelta": 0.22,
+        "decayDays": 12
+      },
+      "affectsFragility": {
+        "all_financials": 0.15,
+        "C": 0.12,
+        "GS": 0.1,
+        "MS": 0.12,
+        "AIG": 0.1
+      },
+      "unlocks": [
+        "coordinated_global_rescue",
+        "vix_intraday_peak"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "市场数据"
+      ]
+    },
+    {
+      "id": "coordinated_global_rescue",
+      "phase": 4,
+      "date": "2008-10-13",
+      "title": "全球政府联合救助银行体系",
+      "headline": "欧元区与英国宣布逾 2 万亿欧元银行担保与注资计划，美联储无限量提供美元流动性",
+      "narrative": "各国政府终于统一行动：为银行债务提供担保、直接注资、央行无限量提供美元。\n\n市场当天暴涨 11%——**但真正止跌还要等五个月。** 政策能阻止崩溃，但不能立刻创造复苏。",
+      "window": [
+        "2008-10-10",
+        "2008-10-31"
+      ],
+      "requires": [
+        "global_meltdown_oct"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.15,
+        "indexReturn": 0.112,
+        "volMultiplier": 0.75,
+        "creditSpreadDelta": -180,
+        "liquidityMultiplier": 1.6,
+        "repoHaircutDelta": -0.08,
+        "decayDays": 25
+      },
+      "affectsFragility": {
+        "all_financials": -0.12,
+        "C": -0.08,
+        "RBS": -0.05,
+        "UBS": -0.05
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "各国政府公告"
+      ]
+    },
+    {
+      "id": "vix_intraday_peak",
+      "phase": 4,
+      "date": "2008-10-24",
+      "title": "VIX 盘中触及 89.53，历史最高",
+      "headline": "芝加哥期权交易所波动率指数盘中升至 89.53，收盘 79.13",
+      "narrative": "有史以来最高的恐慌读数。**在这个波动率水平上，所有期权都贵得离谱**——买保护的成本本身就成了一种惩罚。\n\n如果你持有深度虚值看跌，此刻账面应该非常漂亮。问题是：你打算什么时候卖？",
+      "window": [
+        "2008-10-15",
+        "2008-11-15"
+      ],
+      "requires": [
+        "global_meltdown_oct"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "state",
+        "predicate": "vix > 75",
+        "probabilityPerDay": 0.12
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [],
+        "equityReturn": 0,
+        "indexReturn": -0.031,
+        "volMultiplier": 1.2,
+        "creditSpreadDelta": 60,
+        "liquidityMultiplier": 0.25,
+        "repoHaircutDelta": 0.05,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "all_financials": 0.05
+      },
+      "unlocks": [],
+      "newsVisibility": 1,
+      "sources": [
+        "CBOE VIX 历史"
+      ]
+    },
+    {
+      "id": "aig_second_bailout",
+      "phase": 4,
+      "date": "2008-11-10",
+      "title": "AIG 二次救助，规模扩大至 1500 亿美元",
+      "headline": "美联储与财政部重组 AIG 救助方案，总规模升至 1500 亿美元",
+      "narrative": "第一次救助不够。AIG 的亏损继续扩大，抵押品追缴螺旋没有停止。\n\n**这是「救助不是一次性事件」的第一课：当一家机构太大太复杂，救助会变成一种持续的状态。**",
+      "window": [
+        "2008-10-15",
+        "2008-12-15"
+      ],
+      "requires": [
+        "aig_bailout"
+      ],
+      "requireAnyOf": [
+        [
+          "global_meltdown_oct"
+        ]
+      ],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "insurer",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "AIG",
+          "financials"
+        ],
+        "equityReturn": -0.1,
+        "indexReturn": -0.024,
+        "volMultiplier": 1.2,
+        "creditSpreadDelta": 100,
+        "liquidityMultiplier": 0.4,
+        "repoHaircutDelta": 0.08,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "AIG": -0.1,
+        "all_financials": 0.06
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "美联储公告",
+        "FCIC Report"
+      ]
+    },
+    {
+      "id": "sp500_low_nov2008",
+      "phase": 4,
+      "date": "2008-11-20",
+      "title": "标普 500 跌至 752 点",
+      "headline": "标普 500 收于 752.44 点，VIX 收盘创历史新高 80.86",
+      "narrative": "从 2007 年 10 月的高点算起，市场已经下跌 52%。\n\n**注意：这里不是底。** 大多数人此刻认为还会继续跌——包括很多后来在 676 点抄底的人。如果你在这里全仓做空并认为自己是天才，四个月后你会知道结果。",
+      "window": [
+        "2008-11-01",
+        "2008-12-31"
+      ],
+      "requires": [
+        "global_meltdown_oct"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.08
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.067,
+        "volMultiplier": 1.3,
+        "creditSpreadDelta": 120,
+        "liquidityMultiplier": 0.2,
+        "repoHaircutDelta": 0.1,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "C": 0.12,
+        "all_financials": 0.1
+      },
+      "unlocks": [
+        "citigroup_bailout"
+      ],
+      "newsVisibility": 0,
+      "isTrap": true,
+      "trapNote": "对做空者而言这是最大的陷阱：2008-11 的低点距离真正的底部（2009-03-09，676 点）只差 10%，但距离年末反弹后的水平差了 48%。见底时间不确定，正是随机扰动的意义。",
+      "sources": [
+        "市场数据",
+        "CBOE"
+      ]
+    },
+    {
+      "id": "citigroup_bailout",
+      "phase": 4,
+      "date": "2008-11-23",
+      "title": "花旗集团被救助",
+      "headline": "财政部、美联储与 FDIC 联合为花旗 3060 亿美元资产提供担保，并注资 200 亿美元",
+      "narrative": "花旗股价已跌破 4 美元，市值蒸发超过 90%。它的资产规模是全球第一，涉及 100 多个国家的支付清算网络。\n\n**「太大而不能倒」在这里得到了最直白的证明**：政府不是选择救它，是没有选择。",
+      "window": [
+        "2008-11-15",
+        "2008-12-31"
+      ],
+      "requires": [
+        "sp500_low_nov2008"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.15
+      },
+      "tier": "commercial_bank",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "C",
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.55,
+        "indexReturn": 0.065,
+        "volMultiplier": 0.8,
+        "creditSpreadDelta": -120,
+        "liquidityMultiplier": 1.4,
+        "repoHaircutDelta": -0.06,
+        "decayDays": 15
+      },
+      "affectsFragility": {
+        "C": -0.25,
+        "all_financials": -0.1,
+        "BAC": -0.05
+      },
+      "unlocks": [
+        "fed_zero_rates"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "财政部公告",
+        "FDIC"
+      ]
+    },
+    {
+      "id": "madoff_scandal",
+      "phase": 4,
+      "date": "2008-12-11",
+      "title": "麦道夫庞氏骗局曝光",
+      "headline": "伯纳德·麦道夫被捕，涉案金额约 650 亿美元，为史上最大庞氏骗局",
+      "narrative": "在危机最深处，又爆出一个持续了二十年的骗局。它提醒所有人：**在牛市里，没人会去查收益是从哪来的。**\n\n对冲基金的赎回压力因此进一步加剧——投资者不再相信任何「稳定收益」。",
+      "window": [
+        "2008-12-01",
+        "2009-01-31"
+      ],
+      "requires": [
+        "global_meltdown_oct"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.1
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": false,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "equityReturn": 0,
+        "indexReturn": -0.029,
+        "volMultiplier": 1.15,
+        "creditSpreadDelta": 40,
+        "liquidityMultiplier": 0.55,
+        "repoHaircutDelta": 0.04,
+        "decayDays": 10
+      },
+      "affectsFragility": {
+        "all_financials": 0.03
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "SEC 诉讼文件"
+      ]
+    },
+    {
+      "id": "fed_zero_rates",
+      "phase": 4,
+      "date": "2008-12-16",
+      "title": "美联储降息至零",
+      "headline": "联邦基金利率目标区间降至 0–0.25%，美联储宣布将直接购买机构债与 MBS",
+      "narrative": "传统货币政策弹药耗尽。美联储转向量化宽松——**直接印钱购买资产。**\n\n市场当天大涨 5%。这是危机期间政策工具演进的终点：从降息，到提供流动性，到担保，到注资，到直接购买资产。",
+      "window": [
+        "2008-12-01",
+        "2009-01-31"
+      ],
+      "requires": [
+        "citigroup_bailout"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.2
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "financials"
+        ],
+        "equityReturn": 0.06,
+        "indexReturn": 0.051,
+        "volMultiplier": 0.82,
+        "creditSpreadDelta": -90,
+        "liquidityMultiplier": 1.45,
+        "repoHaircutDelta": -0.05,
+        "decayDays": 25
+      },
+      "affectsFragility": {
+        "all_financials": -0.08
+      },
+      "unlocks": [
+        "auto_bailout"
+      ],
+      "newsVisibility": 0,
+      "sources": [
+        "FOMC 声明"
+      ]
+    },
+    {
+      "id": "auto_bailout",
+      "phase": 4,
+      "date": "2008-12-19",
+      "title": "汽车三巨头获救助",
+      "headline": "布什政府宣布向通用与克莱斯勒提供 174 亿美元紧急贷款",
+      "narrative": "危机从金融扩散到实体经济。汽车行业雇佣数百万人，它的供应链遍布全美。\n\n**这是「金融危机变成经济危机」的明确标志**——而实体经济的恶化，会反过来制造更多房贷违约。",
+      "window": [
+        "2008-12-10",
+        "2009-02-28"
+      ],
+      "requires": [
+        "fed_zero_rates"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 0.15
+      },
+      "tier": "policy",
+      "reversible": true,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX",
+          "autos"
+        ],
+        "equityReturn": 0.1,
+        "indexReturn": 0.004,
+        "volMultiplier": 0.95,
+        "creditSpreadDelta": -30,
+        "liquidityMultiplier": 1.15,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 20
+      },
+      "affectsFragility": {
+        "all_financials": -0.03
+      },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": [
+        "财政部公告"
+      ]
+    }
+  ]
+}

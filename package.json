@@ -1,0 +1,22 @@
+{
+  "name": "can-you-survive-the-credit-crisis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "你能不能逃过信贷危机 —— 2007-2009 信贷危机回合制交易模拟游戏",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "test": "node --test \"packages/core/test/*.test.ts\"",
+    "sim": "node packages/core/test/manual-sim.ts",
+    "validate": "python tools/validate_events.py",
+    "timeline": "python tools/gen_timeline.py --write",
+    "check": "python tools/validate_events.py && python tools/gen_timeline.py --check"
+  }
+}

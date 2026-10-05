@@ -1,0 +1,13 @@
+# 统一换行符，避免 Windows/macOS 协作时产生无意义的 diff
+* text=auto eol=lf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.webp binary
+*.parquet binary
+
+# Git 语言统计：文档与数据不计入代码行数
+docs/* linguist-documentation
+data/events/*.json linguist-data
+*.md linguist-documentation

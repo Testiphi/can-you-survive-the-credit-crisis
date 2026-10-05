@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# data pipeline scratch (raw downloads are not committed)
+data/raw/
+data/processed/*.json
+!data/processed/.gitkeep
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*

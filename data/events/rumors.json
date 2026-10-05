@@ -1,0 +1,888 @@
+{
+  "version": 2,
+  "purpose": "程序化传闻生成。用于让玩家面对「信息可信度」问题——真实危机中，大部分流传的消息是错的，但你无法确定哪一条是错的。",
+  "designNote": "传闻是本作中「信息即难度」的主要载体。可信度低的消息会让玩家做出错误决策，但如果传闻永远不可信，玩家就会学会完全忽略它们——所以必须有足够的真消息。真消息比例随难度下降：D0 70%、D1 55%、D2 45%、D3 35%。",
+  "categoryCount": {
+    "credit": 5,
+    "earnings": 3,
+    "funding": 6,
+    "institution_distress": 5,
+    "macro": 1,
+    "market_flow": 8,
+    "policy": 5,
+    "regulatory": 5
+  },
+  "templates": [
+    {
+      "id": "rumor_repo_haircut_jump",
+      "category": "funding",
+      "headlineTemplate": "传：多家回购清算方正在讨论上调结构化抵押品的折扣率",
+      "bodyTemplate": "据两位知情人士称，出借方已内部调整了对非国债抵押品的风险评估，新的折扣率可能在下周生效。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.3,
+        "multiplierIfSystemicStressAbove": {
+          "threshold": 0.5,
+          "value": 2.6
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.03,
+        "indexReturn": -0.005,
+        "creditSpreadDelta": 45,
+        "liquidityMultiplier": 0.85,
+        "repoHaircutDelta": 0.05
+      },
+      "fragilityEffect": 0.05,
+      "cooldownDays": 10,
+      "newsVisibility": 2,
+      "designNote": "本作最重要的预警传闻。它对价格几乎无影响，但会提前告知 haircut 即将跳升——只有 D2 及以上玩家能看到。这是难度梯度最纯粹的体现：同样的新闻，低难度玩家看到的是「无关紧要的传闻」，高难度玩家看到的是「我要被追加保证金了」。"
+    },
+    {
+      "id": "rumor_repo_maturity_shortening",
+      "category": "funding",
+      "headlineTemplate": "传：交易商的回购融资期限正在缩短，隔夜占比大幅上升",
+      "bodyTemplate": "多位市场参与者表示，出借方越来越倾向于只提供隔夜融资，部分机构已无法获得一周以上的期限。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.35
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0,
+        "indexReturn": -0.003,
+        "creditSpreadDelta": 30,
+        "liquidityMultiplier": 0.88,
+        "rolloverRateDelta": -0.08
+      },
+      "fragilityEffect": 0.04,
+      "cooldownDays": 12,
+      "newsVisibility": 2,
+      "designNote": "不改变价格，只改变「期限」。期限越短，挤兑越快——这是一个纯粹的时间维度威胁。"
+    },
+    {
+      "id": "rumor_credit_line_pulled",
+      "category": "funding",
+      "headlineTemplate": "传：{institution} 的备用信贷额度已被银行方面冻结",
+      "bodyTemplate": "据悉至少两家银行拒绝或推迟了该公司的提款请求。该公司称其流动性状况良好。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.28,
+        "multiplierIfFragilityAbove": {
+          "threshold": 0.75,
+          "value": 2.4
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.12,
+        "indexReturn": -0.006,
+        "creditSpreadDelta": 80,
+        "liquidityMultiplier": 0.8,
+        "rolloverRateDelta": -0.15
+      },
+      "fragilityEffect": 0.09,
+      "cooldownDays": 8,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_custody_freeze",
+      "category": "funding",
+      "headlineTemplate": "传：{institution} 的客户资产可能面临冻结，交易对手已开始转移头寸",
+      "bodyTemplate": "多家机构称已启动对该交易商的敞口排查。若属实则客户资产可能面临长时间的清算程序。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.18,
+        "multiplierIfFragilityAbove": {
+          "threshold": 0.85,
+          "value": 3.2
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.25,
+        "indexReturn": -0.008,
+        "creditSpreadDelta": 120,
+        "liquidityMultiplier": 0.65,
+        "rolloverRateDelta": -0.3
+      },
+      "fragilityEffect": 0.16,
+      "cooldownDays": 15,
+      "newsVisibility": 2,
+      "designNote": "这是「券商风险」的入口：如果你的经纪商倒下，你的资产会被冻结。雷曼破产时真实发生过。"
+    },
+    {
+      "id": "rumor_derivative_netting_failure",
+      "category": "funding",
+      "headlineTemplate": "传：某主要交易商的衍生品净额结算出现争议，对手方敞口可能无法轧差",
+      "bodyTemplate": "据称部分双边合约的抵押品安排存在争议，可能导致敞口以名义额而非净额计算。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.22
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.1,
+        "indexReturn": -0.006,
+        "creditSpreadDelta": 90,
+        "liquidityMultiplier": 0.78,
+        "rolloverRateDelta": -0.12
+      },
+      "fragilityEffect": 0.08,
+      "cooldownDays": 14,
+      "newsVisibility": 2
+    },
+    {
+      "id": "rumor_margin_hike",
+      "category": "funding",
+      "headlineTemplate": "传：交易所将于本周上调股指期货与期权保证金要求",
+      "bodyTemplate": "据称清算所已就提高保证金比率完成内部讨论，以应对近期波动率上升。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.35,
+        "multiplierIfVixAbove": {
+          "threshold": 40,
+          "value": 2.0
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.02,
+        "indexReturn": -0.006,
+        "creditSpreadDelta": 30,
+        "liquidityMultiplier": 0.85,
+        "marginRequirementMultiplier": 1.25
+      },
+      "fragilityEffect": 0.04,
+      "cooldownDays": 12,
+      "newsVisibility": 1,
+      "designNote": "直接影响玩家自己的保证金要求，与 SRS 驱动的 L3 监管限制形成叠加。"
+    },
+    {
+      "id": "rumor_liquidity_strain",
+      "category": "institution_distress",
+      "headlineTemplate": "传：{institution} 今日在回购市场遭遇对手方撤单，被迫动用备用信贷额度",
+      "bodyTemplate": "多位不愿具名的交易员称，{institution} 的隔夜融资利率明显高于同业。该公司发言人拒绝置评。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.35,
+        "multiplierIfFragilityAbove": {
+          "threshold": 0.75,
+          "value": 2.2
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.06,
+        "indexReturn": -0.004,
+        "creditSpreadDelta": 35,
+        "liquidityMultiplier": 0.9
+      },
+      "fragilityEffect": 0.04,
+      "cooldownDays": 5,
+      "newsVisibility": 0
+    },
+    {
+      "id": "rumor_counterparty_pullback",
+      "category": "institution_distress",
+      "headlineTemplate": "传：多家机构削减对 {institution} 的信用额度",
+      "bodyTemplate": "据两位知情人士透露，至少三家主要对手方在过去 48 小时内提高了对 {institution} 的交易抵押要求。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.3,
+        "multiplierIfCreditSpreadAbove": {
+          "threshold": 400,
+          "value": 2.0
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.08,
+        "indexReturn": -0.006,
+        "creditSpreadDelta": 50,
+        "liquidityMultiplier": 0.85
+      },
+      "fragilityEffect": 0.06,
+      "cooldownDays": 7,
+      "newsVisibility": 0
+    },
+    {
+      "id": "rumor_bank_run",
+      "category": "institution_distress",
+      "headlineTemplate": "传：{institution} 分行出现储户排队取款",
+      "bodyTemplate": "社交媒体上的视频显示部分网点出现异常人流。银行方面称网点运营正常。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.2,
+        "multiplierIfConfidenceBelow": {
+          "threshold": 0.4,
+          "value": 3.0
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.2,
+        "indexReturn": -0.008,
+        "creditSpreadDelta": 60,
+        "liquidityMultiplier": 0.75
+      },
+      "fragilityEffect": 0.12,
+      "cooldownDays": 12,
+      "newsVisibility": 0,
+      "designNote": "自我实现型传闻的极致。即使最初是假的，被相信之后也会变成真的。"
+    },
+    {
+      "id": "rumor_broker_dealer_failure",
+      "category": "institution_distress",
+      "headlineTemplate": "传：{institution} 已聘请重组顾问，正在评估破产保护选项",
+      "bodyTemplate": "据称该公司已与外部法律与重组顾问接触。公司方面拒绝对此置评。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.25,
+        "multiplierIfFragilityAbove": {
+          "threshold": 0.8,
+          "value": 2.8
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.22,
+        "indexReturn": -0.007,
+        "creditSpreadDelta": 100,
+        "liquidityMultiplier": 0.72
+      },
+      "fragilityEffect": 0.14,
+      "cooldownDays": 10,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_ceo_resignation",
+      "category": "institution_distress",
+      "headlineTemplate": "传：{institution} CEO 将于本周辞职",
+      "bodyTemplate": "消息人士称董事会已开始物色继任者。市场通常把 CEO 离职解读为坏账规模超出预期的信号。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.3
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.05,
+        "indexReturn": -0.002,
+        "creditSpreadDelta": 25,
+        "liquidityMultiplier": 0.94
+      },
+      "fragilityEffect": 0.03,
+      "cooldownDays": 15,
+      "newsVisibility": 0
+    },
+    {
+      "id": "rumor_writedown",
+      "category": "earnings",
+      "headlineTemplate": "传：{institution} 将在下季度财报中追加减记 {amount} 亿美元",
+      "bodyTemplate": "分析师普遍预期该公司需要进一步减记结构化产品敞口。公司方面表示不对市场猜测发表评论。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.4
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.05,
+        "indexReturn": -0.003,
+        "creditSpreadDelta": 30,
+        "liquidityMultiplier": 0.94
+      },
+      "fragilityEffect": 0.03,
+      "cooldownDays": 10,
+      "newsVisibility": 0
+    },
+    {
+      "id": "rumor_cdo_valuation_dispute",
+      "category": "earnings",
+      "headlineTemplate": "传：{institution} 与审计师就结构化产品的估值方法存在分歧",
+      "bodyTemplate": "据悉双方对 Level 3 资产的模型假设无法达成一致，可能影响即将发布的财报。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.25
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.07,
+        "indexReturn": -0.004,
+        "creditSpreadDelta": 45,
+        "liquidityMultiplier": 0.88
+      },
+      "fragilityEffect": 0.06,
+      "cooldownDays": 14,
+      "newsVisibility": 2,
+      "designNote": "「盯市 vs 模型定价」争议的传闻入口，与 docs/03 的会计主题呼应。"
+    },
+    {
+      "id": "rumor_auditor_qualification",
+      "category": "earnings",
+      "headlineTemplate": "传：{institution} 的审计师可能对财报出具保留意见",
+      "bodyTemplate": "据称审计方对部分资产的持续经营假设存疑。这将是极其罕见的信号。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.12
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.18,
+        "indexReturn": -0.005,
+        "creditSpreadDelta": 90,
+        "liquidityMultiplier": 0.75
+      },
+      "fragilityEffect": 0.13,
+      "cooldownDays": 20,
+      "newsVisibility": 2
+    },
+    {
+      "id": "rumor_rating_downgrade",
+      "category": "credit",
+      "headlineTemplate": "传：评级机构将于本周下调 {institution} 评级展望至负面",
+      "bodyTemplate": "消息人士称，评级委员会已就 {institution} 的资本充足状况召开特别会议。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.35
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.07,
+        "indexReturn": -0.004,
+        "creditSpreadDelta": 45,
+        "liquidityMultiplier": 0.88
+      },
+      "fragilityEffect": 0.05,
+      "cooldownDays": 8,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_insurer_downgrade_cascade",
+      "category": "credit",
+      "headlineTemplate": "传：一家债券保险商即将被降级，可能引发其所担保债券的连锁降级",
+      "bodyTemplate": "据称涉及的名义本金规模可能达到数千亿美元。被担保债券的持有人可能面临强制卖出。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.3
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.05,
+        "indexReturn": -0.007,
+        "creditSpreadDelta": 70,
+        "liquidityMultiplier": 0.82
+      },
+      "fragilityEffect": 0.07,
+      "cooldownDays": 12,
+      "newsVisibility": 1,
+      "designNote": "机械传染放大器的传闻版本——一次降级导致成千上万只债券同时被降级。"
+    },
+    {
+      "id": "rumor_sovereign_downgrade",
+      "category": "credit",
+      "headlineTemplate": "传：某主权国家的银行体系可能需要国际救助",
+      "bodyTemplate": "据称该国银行的批发融资已完全依赖央行紧急便利，外汇储备正在快速消耗。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.2
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.03,
+        "indexReturn": -0.006,
+        "creditSpreadDelta": 55,
+        "liquidityMultiplier": 0.85
+      },
+      "fragilityEffect": 0.05,
+      "cooldownDays": 20,
+      "newsVisibility": 3,
+      "designNote": "D3 欧洲支线的入口。"
+    },
+    {
+      "id": "rumor_municipal_contagion",
+      "category": "credit",
+      "headlineTemplate": "传：市政债券市场出现流动性枯竭，多个州政府融资受阻",
+      "bodyTemplate": "债券保险商的问题已波及市政债。短期市政债利率单日跳升逾 200 个基点。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.28
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.01,
+        "indexReturn": -0.004,
+        "creditSpreadDelta": 60,
+        "liquidityMultiplier": 0.86
+      },
+      "fragilityEffect": 0.04,
+      "cooldownDays": 15,
+      "newsVisibility": 2
+    },
+    {
+      "id": "rumor_gse_capital_shortfall",
+      "category": "credit",
+      "headlineTemplate": "传：两房资本金缺口远大于监管报告数字",
+      "bodyTemplate": "据独立分析估算，若按市场价格对两家机构的资产进行重估，其资本金缺口可能达到数百亿美元。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.35
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.15,
+        "indexReturn": -0.008,
+        "creditSpreadDelta": 70,
+        "liquidityMultiplier": 0.8
+      },
+      "fragilityEffect": 0.1,
+      "cooldownDays": 12,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_bailout_coming",
+      "category": "policy",
+      "headlineTemplate": "传：政府正在准备针对 {institution} 的救助方案",
+      "bodyTemplate": "据称财政部与美联储已就 {institution} 的处置选项进行讨论，方案可能包括注资或资产担保。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.3,
+        "multiplierIfFragilityAbove": {
+          "threshold": 0.8,
+          "value": 2.5
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.18,
+        "indexReturn": 0.008,
+        "creditSpreadDelta": -60,
+        "liquidityMultiplier": 1.15
+      },
+      "fragilityEffect": -0.05,
+      "cooldownDays": 10,
+      "newsVisibility": 0,
+      "designNote": "这类传闻在危机中有真实的自我实现性：市场相信会救，融资压力就下降，于是真的不用救。"
+    },
+    {
+      "id": "rumor_no_bailout",
+      "category": "policy",
+      "headlineTemplate": "传：监管当局内部已决定不再提供救助，将让 {institution} 自行解决",
+      "bodyTemplate": "多位消息人士表示，出于道德风险考虑，当局倾向于不再重复贝尔斯登式的安排。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.28
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.15,
+        "indexReturn": -0.007,
+        "creditSpreadDelta": 70,
+        "liquidityMultiplier": 0.8
+      },
+      "fragilityEffect": 0.09,
+      "cooldownDays": 10,
+      "newsVisibility": 0,
+      "designNote": "与 rumor_bailout_coming 是相反预期。玩家必须在两者之间判断，而两者都可能为真。"
+    },
+    {
+      "id": "rumor_fed_emergency_meeting",
+      "category": "policy",
+      "headlineTemplate": "传：美联储正在召开非例行闭门会议，可能于盘前宣布行动",
+      "bodyTemplate": "据称会议涉及一项新的流动性便利工具。历史上类似的紧急行动往往伴随市场大幅波动。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.3,
+        "multiplierIfTedAbove": {
+          "threshold": 2.0,
+          "value": 2.2
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0,
+        "indexReturn": 0.012,
+        "creditSpreadDelta": -40,
+        "liquidityMultiplier": 1.15
+      },
+      "fragilityEffect": -0.04,
+      "cooldownDays": 12,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_tarp_expansion",
+      "category": "policy",
+      "headlineTemplate": "传：救助计划规模将扩大，并可能包含直接注资银行",
+      "bodyTemplate": "据称政策制定者正在讨论把资金用途从购买不良资产转向直接向银行注资。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.35
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.04,
+        "indexReturn": 0.015,
+        "creditSpreadDelta": -70,
+        "liquidityMultiplier": 1.2
+      },
+      "fragilityEffect": -0.06,
+      "cooldownDays": 15,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_bank_holiday",
+      "category": "policy",
+      "headlineTemplate": "传：监管机构正在讨论临时关闭市场或宣布银行假日的可能性",
+      "bodyTemplate": "据称该选项被列为极端情形下的备选方案。若实施，所有持仓将无法平仓。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.06,
+        "multiplierIfSystemicStressAbove": {
+          "threshold": 0.85,
+          "value": 3.0
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.06,
+        "indexReturn": -0.03,
+        "creditSpreadDelta": 100,
+        "liquidityMultiplier": 0.5
+      },
+      "fragilityEffect": 0.1,
+      "cooldownDays": 25,
+      "newsVisibility": 2,
+      "designNote": "极低概率但极高冲击。它的存在让玩家意识到：市场本身可能停止运转，届时「止损」这个概念不存在。"
+    },
+    {
+      "id": "rumor_short_ban_consideration",
+      "category": "regulatory",
+      "headlineTemplate": "传：监管机构正在讨论临时限制金融股卖空",
+      "bodyTemplate": "据悉 SEC 与海外监管机构就协同限制卖空展开磋商，以应对近期金融股的大幅下跌。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.25,
+        "multiplierIfMarketDown": {
+          "threshold": -0.15,
+          "windowDays": 20,
+          "value": 2.4
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.06,
+        "indexReturn": 0.01,
+        "creditSpreadDelta": -40,
+        "liquidityMultiplier": 1.2
+      },
+      "fragilityEffect": -0.03,
+      "cooldownDays": 15,
+      "newsVisibility": 1,
+      "designNote": "对高 SRS 玩家来说，这是最需要警惕的一条传闻——如果为真，你的空头策略会被直接锁死。"
+    },
+    {
+      "id": "rumor_prosecution",
+      "category": "regulatory",
+      "headlineTemplate": "传：监管机构已就 {institution} 的会计处理展开调查",
+      "bodyTemplate": "据称调查涉及抵押品估值方法。该公司表示将配合任何问询。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.22
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.09,
+        "indexReturn": -0.003,
+        "creditSpreadDelta": 40,
+        "liquidityMultiplier": 0.9
+      },
+      "fragilityEffect": 0.06,
+      "cooldownDays": 15,
+      "newsVisibility": 2
+    },
+    {
+      "id": "rumor_short_interest_probe",
+      "category": "regulatory",
+      "headlineTemplate": "传：监管机构正在调查金融股是否存在协同做空行为",
+      "bodyTemplate": "据悉执法部门已向多家对冲基金发出信息请求，要求提供交易记录与通讯记录。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.28,
+        "multiplierIfPlayerSRSAbove": {
+          "threshold": 0.35,
+          "value": 2.2
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.03,
+        "indexReturn": 0.005,
+        "creditSpreadDelta": -30,
+        "liquidityMultiplier": 1.1
+      },
+      "fragilityEffect": -0.02,
+      "cooldownDays": 18,
+      "newsVisibility": 2
+    },
+    {
+      "id": "rumor_sec_watching_player",
+      "category": "regulatory",
+      "headlineTemplate": "传：SEC 正在审查近期的异常卖空交易，关注集中度异常的账户",
+      "bodyTemplate": "知情人士称，执法部门已调取部分交易记录。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.15,
+        "multiplierIfPlayerSRSAbove": {
+          "threshold": 0.5,
+          "value": 4.0
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0,
+        "indexReturn": 0,
+        "creditSpreadDelta": 0,
+        "liquidityMultiplier": 1.0
+      },
+      "fragilityEffect": 0,
+      "cooldownDays": 20,
+      "newsVisibility": 2,
+      "playerSrsEffect": 0.05,
+      "designNote": "唯一一条直接指向玩家的传闻。它不改变市场，只改变玩家自己的 SRS 与其心理状态——L1「安静的红点」的传闻版本。"
+    },
+    {
+      "id": "rumor_disclosure_breach",
+      "category": "regulatory",
+      "headlineTemplate": "传：某机构未按规披露其空头头寸，可能面临强制披露要求",
+      "bodyTemplate": "据称监管方已注意到某些账户的持仓集中度超过了披露门槛。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.2,
+        "multiplierIfPlayerSRSAbove": {
+          "threshold": 0.4,
+          "value": 3.0
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.02,
+        "indexReturn": 0.003,
+        "creditSpreadDelta": -20,
+        "liquidityMultiplier": 1.05
+      },
+      "fragilityEffect": -0.02,
+      "cooldownDays": 20,
+      "newsVisibility": 3,
+      "playerSrsEffect": 0.08,
+      "designNote": "对应监管阶梯 L2（5% 强制披露）。披露后其他 NPC 能看到你的仓位并跟随或反向。"
+    },
+    {
+      "id": "rumor_fund_liquidation",
+      "category": "market_flow",
+      "headlineTemplate": "传：{institution} 旗下基金遭遇大规模赎回，被迫抛售持仓",
+      "bodyTemplate": "投资者称该基金已限制赎回。被迫卖出可能对相关资产价格造成进一步压力。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.45
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.04,
+        "indexReturn": -0.005,
+        "creditSpreadDelta": 25,
+        "liquidityMultiplier": 0.82
+      },
+      "fragilityEffect": 0.03,
+      "cooldownDays": 6,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_hedge_fund_gate",
+      "category": "market_flow",
+      "headlineTemplate": "传：多家对冲基金已启动赎回限制（gate），投资者无法撤资",
+      "bodyTemplate": "据投资者称，部分基金以「市场流动性不足」为由暂停赎回，这在危机中会引发更大范围的恐慌。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.35
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.04,
+        "indexReturn": -0.006,
+        "creditSpreadDelta": 40,
+        "liquidityMultiplier": 0.78
+      },
+      "fragilityEffect": 0.05,
+      "cooldownDays": 12,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_redemption_wave",
+      "category": "market_flow",
+      "headlineTemplate": "传：本月对冲基金赎回请求创历史新高，被迫卖出压力集中在月底",
+      "bodyTemplate": "赎回通常有 30–90 天通知期，因此抛售压力会在特定日期集中释放。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.5
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.03,
+        "indexReturn": -0.008,
+        "creditSpreadDelta": 35,
+        "liquidityMultiplier": 0.75
+      },
+      "fragilityEffect": 0.04,
+      "cooldownDays": 20,
+      "newsVisibility": 2,
+      "designNote": "引入「赎回日历」概念——某些日期的抛压是可预测的。这让 D2 玩家可以做事件驱动的择时。"
+    },
+    {
+      "id": "rumor_market_maker_pullback",
+      "category": "market_flow",
+      "headlineTemplate": "传：主要做市商已大幅收缩报价规模，买卖价差扩大至正常水平的十倍",
+      "bodyTemplate": "交易员称，在部分信用产品上已经无法获得双边报价。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.4,
+        "multiplierIfLiquidityBelow": {
+          "threshold": 0.4,
+          "value": 2.0
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.01,
+        "indexReturn": -0.004,
+        "creditSpreadDelta": 30,
+        "liquidityMultiplier": 0.65
+      },
+      "fragilityEffect": 0.04,
+      "cooldownDays": 8,
+      "newsVisibility": 1,
+      "designNote": "直接对应流动性模型 L(t)。价差扩大意味着玩家的冲击成本上升。"
+    },
+    {
+      "id": "rumor_hedge_fund_wins",
+      "category": "market_flow",
+      "headlineTemplate": "传：某大型对冲基金通过做空次贷获利逾 {amount} 亿美元",
+      "bodyTemplate": "据投资者透露，该基金今年的回报率已超过 100%，主要来自信用违约互换头寸。",
+      "targetInstitutionRequired": false,
+      "trueProbability": {
+        "base": 0.6
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0,
+        "indexReturn": -0.003,
+        "creditSpreadDelta": 15,
+        "liquidityMultiplier": 0.96
+      },
+      "fragilityEffect": 0.02,
+      "cooldownDays": 20,
+      "newsVisibility": 1,
+      "designNote": "好消息型传闻，用于让玩家不至于学会「忽略一切消息」。同时暗示做空信用是可行的。"
+    },
+    {
+      "id": "rumor_sovereign_wealth_injection",
+      "category": "market_flow",
+      "headlineTemplate": "传：某主权财富基金正在洽谈向 {institution} 注资",
+      "bodyTemplate": "据称谈判已进入尽职调查阶段，规模可能达到数十亿美元。这类注资在 2007–2008 年多次出现，但多数在一年内就亏损过半。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.3
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.09,
+        "indexReturn": 0.005,
+        "creditSpreadDelta": -45,
+        "liquidityMultiplier": 1.12
+      },
+      "fragilityEffect": -0.05,
+      "cooldownDays": 15,
+      "newsVisibility": 1
+    },
+    {
+      "id": "rumor_buffett_capital",
+      "category": "market_flow",
+      "headlineTemplate": "传：某著名长期投资者正考虑向 {institution} 注资",
+      "bodyTemplate": "据称条件相当苛刻，包括高额股息与优先清偿权。市场通常把这类消息解读为「该公司还有价值」。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.22
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.12,
+        "indexReturn": 0.006,
+        "creditSpreadDelta": -55,
+        "liquidityMultiplier": 1.15
+      },
+      "fragilityEffect": -0.07,
+      "cooldownDays": 20,
+      "newsVisibility": 1,
+      "designNote": "历史上这类注资（高盛、GE、瑞士再保险）确实发生过，而且条款极为苛刻——注资方拿走了绝大部分上行收益。这是「救你的人赚走了你的 upside」的一课。"
+    },
+    {
+      "id": "rumor_merger_talks",
+      "category": "market_flow",
+      "headlineTemplate": "传：{institution} 正在与一家大型商业银行洽谈并购",
+      "bodyTemplate": "据称谈判由监管机构推动，价格可能远低于账面价值。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.3,
+        "multiplierIfFragilityAbove": {
+          "threshold": 0.8,
+          "value": 2.2
+        }
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": -0.12,
+        "indexReturn": 0.003,
+        "creditSpreadDelta": -30,
+        "liquidityMultiplier": 1.05
+      },
+      "fragilityEffect": -0.08,
+      "cooldownDays": 12,
+      "newsVisibility": 1,
+      "designNote": "注意方向：对目标公司股价是【负】的（被低价收购），对整个市场是【正】的（问题被解决）。玩家如果做空了目标公司，这笔交易会让他的空头被低价买断。"
+    },
+    {
+      "id": "rumor_recovery_signal",
+      "category": "macro",
+      "headlineTemplate": "传：{institution} 高管称信贷市场已出现解冻迹象",
+      "bodyTemplate": "该公司在内部会议中表示，近期的融资交易表明市场功能正在恢复。",
+      "targetInstitutionRequired": true,
+      "trueProbability": {
+        "base": 0.35
+      },
+      "priceEffectIfBelieved": {
+        "targetEquityReturn": 0.05,
+        "indexReturn": 0.008,
+        "creditSpreadDelta": -35,
+        "liquidityMultiplier": 1.18
+      },
+      "fragilityEffect": -0.04,
+      "cooldownDays": 12,
+      "newsVisibility": 1
+    }
+  ],
+  "credibilityModel": {
+    "note": "每条传闻发布时携带 credibility ∈ [0,1]，玩家看到的可信度是真实 isTrue 的噪声版本",
+    "observedCredibility": "clamp(trueCredibility + N(0, 0.18), 0.05, 0.95)",
+    "trueCredibilitySources": [
+      "消息源质量（投行内部 vs 社交媒体）",
+      "是否有第二来源",
+      "与已知指标是否一致"
+    ],
+    "difficultyScaling": {
+      "D0": {
+        "trueRatio": 0.7,
+        "noiseSigma": 0.14,
+        "visibleCategories": [
+          "institution_distress",
+          "market_flow",
+          "policy"
+        ]
+      },
+      "D1": {
+        "trueRatio": 0.55,
+        "noiseSigma": 0.16,
+        "visibleCategories": [
+          "institution_distress",
+          "market_flow",
+          "policy",
+          "credit",
+          "earnings"
+        ]
+      },
+      "D2": {
+        "trueRatio": 0.45,
+        "noiseSigma": 0.18,
+        "visibleCategories": [
+          "*"
+        ]
+      },
+      "D3": {
+        "trueRatio": 0.35,
+        "noiseSigma": 0.2,
+        "visibleCategories": [
+          "*"
+        ],
+        "extraNoise": "对手方可主动投放假消息"
+      }
+    }
+  },
+  "implementationNotes": [
+    "每条传闻的 priceEffectIfBelieved 只在玩家【或 NPC】相信它时才生效——即 credibility 高于该 NPC 的信任阈值。",
+    "传闻本身不改变真实基本面，但它改变 NPC 行为，而 NPC 行为改变价格。这就是「自我实现」的完整链条。",
+    "rumor_sec_watching_player 与 rumor_disclosure_breach 携带 playerSrsEffect，只作用于玩家自己的 SRS，不影响市场。",
+    "携带 marginRequirementMultiplier 的传闻（rumor_margin_hike）直接修改玩家的保证金要求，是唯一能改变账户规则的传闻类型。",
+    "生成频率建议：平静期每 3–5 个交易日一条，危机期每 1–2 个交易日一条，危机顶点每日 2–3 条。信息过载本身也是难度的一部分。"
+  ]
+}
