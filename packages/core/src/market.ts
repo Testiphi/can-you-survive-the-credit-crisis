@@ -9,8 +9,21 @@ import type { Bar, DateStr, Fill, MacroState, Order } from './types.ts';
 import type { InstrumentDef } from './instruments.ts';
 import type { Rng } from './rng.ts';
 
-/** 单日收益的硬性边界，防止数值爆炸。 */
-const MAX_DAILY_RETURN = 0.35;
+/**
+ * 随机成分的单日上限（防止 GBM 噪声数值爆炸）。
+ *
+ * 注意：这个上限**只作用于随机成分**（beta + 特质 + 跳跃）。
+ * 事件卡刻意设定的大冲击不受它约束——`lehman_collapse` 的 −94%、
+ * `bear_stearns_collapse` 的 −90% 都是真实的历史单日跌幅，被削平成
+ * −35% 会让「破产」这个事件完全失去重量。
+ *
+ * 早前的实现把整个收益一起 clamp，导致所有事件冲击静默截断在 ±35%，
+ * 而单元测试完全没发现——因为测试断言的是机制，不是量级。
+ */
+const MAX_STOCHASTIC_RETURN = 0.35;
+
+/** 含事件冲击在内的单日总收益上限（保住物理性：股票一天不能跌超过 100%）。 */
+const MAX_TOTAL_RETURN = 0.97;
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
@@ -44,12 +57,14 @@ export function generateBar(
   const lambdaPerYear = 2 + 28 * macro.systemicStress;
   const jump = rng.jump(lambdaPerYear / 252) ? rng.gaussian(0, def.idioVol * 2.5) : 0;
 
-  const ret = clamp(betaPart + idio + jump + extraReturn, -MAX_DAILY_RETURN, MAX_DAILY_RETURN);
+  // 随机部分先各自限幅，再叠加事件冲击
+  const stochastic = clamp(betaPart + idio + jump, -MAX_STOCHASTIC_RETURN, MAX_STOCHASTIC_RETURN);
+  const ret = clamp(stochastic + extraReturn, -MAX_TOTAL_RETURN, MAX_TOTAL_RETURN);
   const close = Math.max(0.01, prevClose * (1 + ret));
 
   // 日内路径：开盘跳空 + 高低点
   const openGap = ret * rng.range(0.05, 0.55) + (rng.normal() * def.idioVol) / 3;
-  const open = Math.max(0.01, prevClose * (1 + clamp(openGap, -MAX_DAILY_RETURN, MAX_DAILY_RETURN)));
+  const open = Math.max(0.01, prevClose * (1 + clamp(openGap, -MAX_TOTAL_RETURN, MAX_TOTAL_RETURN)));
   const wickUp = Math.abs(rng.normal()) * def.idioVol * 0.9;
   const wickDn = Math.abs(rng.normal()) * def.idioVol * 0.9;
   const high = Math.max(open, close) * (1 + wickUp);

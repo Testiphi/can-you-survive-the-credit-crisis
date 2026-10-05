@@ -90,10 +90,13 @@ check(max(samples['BSC'][2]) < 40, `贝尔斯登应已消失，最大 ${max(samp
 check(max(samples['BSC'][3]) < 5, `贝尔斯登被收购后应接近归零，最大 ${max(samples['BSC'][3]).toFixed(2)}`);
 
 // ③ 幸存者：中位数判断
+// 注意 AIG：它在 2009-07 做了 1:20 反向拆股，所以「实际期末约 $28」是
+// **拆股后**价格，拆股前等价 $1.40。模型用的是拆股前的连续价格序列。
 const med = (id: string, i: number) => median(samples[id][i]);
 check(med('GS', 3) > 40, `高盛期末中位数应 > 40，实际 ${med('GS', 3).toFixed(2)}`);
 check(med('JPM', 3) > 8, `摩根大通期末中位数应 > 8，实际 ${med('JPM', 3).toFixed(2)}`);
-check(med('C', 3) > 1, `花旗期末中位数应 > 1，实际 ${med('C', 3).toFixed(2)}`);
+check(med('C', 3) > 0.5 && med('C', 3) < 12, `花旗期末中位数应在 0.5–12，实际 ${med('C', 3).toFixed(2)}`);
+check(med('AIG', 3) > 0.2 && med('AIG', 3) < 8, `AIG 期末中位数（拆股前）应在 0.2–8，实际 ${med('AIG', 3).toFixed(2)}`);
 check(med('GS', 0) < 450, `高盛 2007 高点中位数应 < 450，实际 ${med('GS', 0).toFixed(2)}`);
 
 // ④ 离散度提示（不判失败，只报告）
