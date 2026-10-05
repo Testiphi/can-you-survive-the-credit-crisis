@@ -495,6 +495,64 @@
       "unlocks": [],
       "newsVisibility": 0,
       "sources": ["市场数据"]
+    },
+    {
+      "id": "goldman_tarp_repayment",
+      "phase": 5,
+      "date": "2009-06-02",
+      "title": "高盛偿还 TARP 资金",
+      "headline": "高盛向财政部偿还 100 亿美元救助资金，成为首批脱离政府救助的主要银行",
+      "narrative": "在同行还在接受第二轮注资的时候，高盛已经把钱还了。\n\n**这是整场危机里最刺眼的一个对比**：高盛靠做空次贷赚了钱，然后在危机底部以极低的价格回购自己的股票。\n\n玩家在这里应该感到一种具体的不适——危机中真正赚到大钱的，往往也是最不需要救助的那些人。",
+      "window": ["2009-05-20", "2009-07-15"],
+      "requires": ["stress_test_results"],
+      "requireAnyOf": [],
+      "trigger": { "type": "scheduled", "probabilityPerDay": 0.22 },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": ["GS", "financials"],
+        "equityReturn": 0.16,
+        "indexReturn": 0.008,
+        "volMultiplier": 0.92,
+        "creditSpreadDelta": -40,
+        "liquidityMultiplier": 1.15,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 25
+      },
+      "affectsFragility": { "GS": -0.12, "MS": -0.04, "all_financials": -0.04 },
+      "unlocks": ["goldman_record_earnings"],
+      "newsVisibility": 0,
+      "sources": ["财政部 TARP 交易记录"]
+    },
+    {
+      "id": "goldman_record_earnings",
+      "phase": 5,
+      "date": "2009-07-14",
+      "title": "高盛创下成立 140 年来最佳季度",
+      "headline": "高盛二季度净利润 34.4 亿美元，为成立以来最好的一季，并宣布大幅提高薪酬拨备",
+      "narrative": "危机最深的那一年半里，高盛的季度利润创了历史新高。\n\n原因不复杂：它在崩盘前做空了次贷，在崩盘后接手了竞争对手的客户，然后用纳税人的钱提供的廉价资金去做多反弹。\n\n**这一课很难受但很重要：危机不是平均地伤害所有人。** 有人被它杀死，有人靠它成为赢家。",
+      "window": ["2009-07-05", "2009-08-31"],
+      "requires": ["goldman_tarp_repayment"],
+      "requireAnyOf": [],
+      "trigger": { "type": "scheduled", "probabilityPerDay": 0.25 },
+      "tier": "investment_bank",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": ["GS", "financials"],
+        "equityReturn": 0.26,
+        "indexReturn": 0.010,
+        "volMultiplier": 0.90,
+        "creditSpreadDelta": -45,
+        "liquidityMultiplier": 1.18,
+        "repoHaircutDelta": -0.02,
+        "decayDays": 40
+      },
+      "affectsFragility": { "GS": -0.18, "all_financials": -0.06 },
+      "unlocks": [],
+      "newsVisibility": 0,
+      "sources": ["高盛财报"]
     }
   ]
 }

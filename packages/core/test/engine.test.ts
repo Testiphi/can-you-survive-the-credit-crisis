@@ -30,7 +30,7 @@ function baseConfig(over: Partial<GameConfig> = {}): Partial<GameConfig> {
 // ------------------------------------------------------------------ 数据集
 
 test('数据集可加载且数量与校验器一致', () => {
-  assert.equal(dataset.events.length, 92);
+  assert.equal(dataset.events.length, 94);
   assert.equal(dataset.institutions.institutions.length, 21);
   assert.equal(dataset.rumors.templates.length, 38);
 });
