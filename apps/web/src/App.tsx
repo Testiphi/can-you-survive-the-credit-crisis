@@ -12,6 +12,7 @@ import {
   LEVEL_LABEL,
   type Difficulty,
   type Identity,
+  type TimelineMode,
 } from '@cyscc/core';
 import { dataset } from './dataset.ts';
 import { KLineChart } from './KLineChart.tsx';
@@ -37,6 +38,12 @@ const IDENTITY_LABEL: Record<Identity, string> = {
   insurer: '保险 / 再保险（$100 亿）',
 };
 
+const TIMELINE_LABEL: Record<TimelineMode, string> = {
+  historical: '历史回放（事件按史实日期发生）',
+  jittered: '小幅抖动 ±10 交易日（推荐）',
+  parallel: '平行时间线 ±30 交易日',
+};
+
 const money = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
@@ -47,6 +54,7 @@ export function App() {
   const [seed, setSeed] = useState(42);
   const [difficulty, setDifficulty] = useState<Difficulty>(1);
   const [identity, setIdentity] = useState<Identity>('retail');
+  const [timeline, setTimeline] = useState<TimelineMode>('jittered');
   const [, forceRender] = useState(0);
   const [selected, setSelected] = useState('LEH');
   const [showMA, setShowMA] = useState(true);
@@ -55,13 +63,13 @@ export function App() {
   const tickRef = useRef(0);
 
   const createEngine = useCallback(
-    (opts: { seed: number; difficulty: Difficulty; identity: Identity }) => {
+    (opts: { seed: number; difficulty: Difficulty; identity: Identity; timeline: TimelineMode }) => {
       engineRef.current = new GameEngine(dataset, {
         config: {
           seed: opts.seed,
           difficulty: opts.difficulty,
           identity: opts.identity,
-          timeline: 'jittered',
+          timeline: opts.timeline,
         },
       });
       tickRef.current = 0;
@@ -221,11 +229,23 @@ export function App() {
               ))}
             </select>
           </label>
+          <label>
+            <span>
+              <Tip text={BUTTON_TIPS.timeline}>时间线模式 ⓘ</Tip>
+            </span>
+            <select value={timeline} onChange={(e) => setTimeline(e.target.value as TimelineMode)}>
+              {(Object.keys(TIMELINE_LABEL) as TimelineMode[]).map((k) => (
+                <option key={k} value={k}>
+                  {TIMELINE_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             className="primary"
             {...startTip}
             onClick={() => {
-              createEngine({ seed, difficulty, identity });
+              createEngine({ seed, difficulty, identity, timeline });
               setStarted(true);
             }}
           >
@@ -705,7 +725,8 @@ export function App() {
       <div className="disclaimer">
         历史模拟，非投资建议，不构成对任何机构或个人的评价。事件冲击数值为设计校准值，
         用于产生正确的相对强度，不是精确回测输出。种子 {engine.config.seed} · 难度 D
-        {engine.config.difficulty} · 铁人模式 {engine.config.ironman ? '开' : '关'}
+        {engine.config.difficulty} · 时间线 {TIMELINE_LABEL[engine.config.timeline].split('（')[0]} ·
+        铁人模式 {engine.config.ironman ? '开' : '关'}
       </div>
     </div>
   );

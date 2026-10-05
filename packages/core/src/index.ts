@@ -60,7 +60,12 @@ export {
   updateConfidence,
   markFailed,
 } from './institutions.ts';
-export { ScenarioEngine, type ScenarioOptions, type FireDecision } from './scenario.ts';
+export {
+  ScenarioEngine,
+  JITTER_BY_TIMELINE,
+  type ScenarioOptions,
+  type FireDecision,
+} from './scenario.ts';
 export { generateBar, executeOrder, type ExecutionParams } from './market.ts';
 export {
   createAccount,

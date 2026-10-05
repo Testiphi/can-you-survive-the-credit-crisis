@@ -173,7 +173,7 @@
         "2007-06-30"
       ],
       "requires": [
-        "subprime_delinquency_rise"
+        "hsbc_subprime_warning"
       ],
       "requireAnyOf": [],
       "trigger": {
@@ -707,7 +707,7 @@
         "2007-12-31"
       ],
       "requires": [
-        "false_calm"
+        "credit_market_freeze"
       ],
       "requireAnyOf": [
         [

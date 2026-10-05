@@ -1811,9 +1811,13 @@
         "2008-10-31"
       ],
       "requires": [
-        "global_meltdown_oct"
+        "lehman_collapse"
       ],
-      "requireAnyOf": [],
+      "requireAnyOf": [
+        [
+          "money_market_run"
+        ]
+      ],
       "trigger": {
         "type": "scheduled",
         "probabilityPerDay": 0.2

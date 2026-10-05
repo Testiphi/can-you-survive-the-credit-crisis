@@ -38,7 +38,7 @@ import {
   markFailed,
   updateConfidence,
 } from './institutions.ts';
-import { ScenarioEngine, type FireDecision } from './scenario.ts';
+import { ScenarioEngine, JITTER_BY_TIMELINE, type FireDecision } from './scenario.ts';
 import { executeOrder, generateBar } from './market.ts';
 import {
   accrueBorrowFees,
@@ -84,6 +84,8 @@ export interface EngineOptions {
   config?: Partial<GameConfig>;
   /** 覆盖竞争风险模型的 κ */
   kappa?: number;
+  /** 覆盖事件日期抖动幅度（交易日）。默认由时间线模式决定。 */
+  jitterDays?: number;
   /** 系统级事件的兜底触发余量（交易日） */
   forceFireMarginDays?: number;
   /** 关闭 NPC（用于单元测试与确定性回归） */
@@ -183,6 +185,8 @@ export class GameEngine {
       difficulty: this.config.difficulty,
       kappa: options.kappa ?? diff.hazardKappa,
       forceFireMarginDays: options.forceFireMarginDays ?? 10,
+      // 三种时间线模式的真正区别：事件日期围绕史实日期的抖动幅度
+      jitterDays: options.jitterDays ?? JITTER_BY_TIMELINE[this.config.timeline],
       dayDiff,
     });
 

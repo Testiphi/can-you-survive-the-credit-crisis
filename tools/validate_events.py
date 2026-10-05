@@ -202,6 +202,38 @@ def check_acyclic(events: list[dict], report: Report) -> None:
                 return
 
 
+def check_causal_dates(events: list[dict], report: Report) -> None:
+    """
+    因果日期一致性：前置条件的**史实日期**不得晚于依赖它的卡片。
+
+    这条检查是必需的，不是洁癖。引擎的时间线模式会把每张卡的触发窗口
+    收窄到 `date ± jitterDays`，一旦出现倒置（前置条件的史实日期更晚），
+    依赖它的卡片在自己的窗口内永远等不到前置条件：
+
+    - 如果它是 `reversible: true` 且非系统性事件，就会**永久失效**
+    - 而它若还有下游依赖者，整条叙事链会从这一环断裂
+
+    实测：`new_century_collapse`（2007-04-02）依赖
+    `subprime_delinquency_rise`（2007-06-01），窗口收窄后 seed 1
+    只触发了 3/94 张卡，贝尔斯登活到了 2009 年底（$122.73）。
+    """
+    by_id = {ev["id"]: ev for ev in events}
+
+    for ev in events:
+        refs: list[str] = list(ev.get("requires", []) or [])
+        for group in ev.get("requireAnyOf", []) or []:
+            refs.extend(group)
+        for ref in refs:
+            pre = by_id.get(ref)
+            if pre is None:
+                continue
+            if pre["date"] > ev["date"]:
+                report.error(
+                    f"因果倒置: {ev['id']}（{ev['date']}）依赖 {ref}（{pre['date']}），"
+                    f"前置条件晚了 {pre['date']} > {ev['date']}"
+                )
+
+
 def check_tier_ordering(events: list[dict], report: Report) -> None:
     """
     分层约束：gse / insurer 层的首个事件不得早于投行层或银行层的首个失败事件。
@@ -262,6 +294,7 @@ def main() -> int:
     check_references(events, ids, report)
     check_windows(events, report)
     check_acyclic(events, report)
+    check_causal_dates(events, report)
     check_tier_ordering(events, report)
 
     print("=" * 64)
