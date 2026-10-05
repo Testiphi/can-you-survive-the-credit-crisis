@@ -24,6 +24,15 @@ import { QuotePanel, computeQuote } from './QuotePanel.tsx';
 const TRADABLE = INSTRUMENTS.filter((i) => i.sector !== 'index');
 const TABS = ['SPX', ...TRADABLE.map((i) => i.id)];
 
+/**
+ * 「快进到事件」的安全阀（交易日）。
+ *
+ * 危机后期事件会变稀疏——2009 年年中可能连续几个月没有卡片触发。
+ * 没有上限的话，一次点击会一路推进到游戏结束，玩家会以为按钮坏了。
+ * 约 6 个月是一个合理的「跳过平静期」尺度。
+ */
+const MAX_EVENT_HUNT_DAYS = 120;
+
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   0: 'D0 看懂危机（K线 + 成交量 + 新闻标题）',
   1: 'D1 基本面（+ 利率 / TED / VIX / 信用利差）',
@@ -58,6 +67,7 @@ export function App() {
   const [, forceRender] = useState(0);
   const [selected, setSelected] = useState('LEH');
   const [showMA, setShowMA] = useState(true);
+  const [skipNote, setSkipNote] = useState<string | null>(null);
 
   const engineRef = useRef<GameEngine | null>(null);
   const tickRef = useRef(0);
@@ -84,17 +94,44 @@ export function App() {
   const proceed = useCallback(
     (steps: number, stopOnEvent: boolean) => {
       const e = engineRef.current;
-      if (!e) return;
+      if (!e) return 0;
+      let advanced = 0;
+      let fired = 0;
       for (let i = 0; i < steps; i++) {
         if (e.isOver) break;
         const res = e.advance();
         tickRef.current++;
+        advanced++;
+        fired += res.firedEventIds.length;
+        // 注意顺序：先推进再判断，因此触发事件的那一天本身也算推进
         if (stopOnEvent && res.firedEventIds.length > 0) break;
       }
+      // 快进到事件却没撞上事件时给出明确反馈，
+      // 否则玩家会以为按钮坏了（危机后期事件确实会变稀疏）
+      if (stopOnEvent) {
+        setSkipNote(
+          fired === 0 && advanced > 0 && !e.isOver
+            ? `快进 ${advanced} 个交易日 —— 这段时间没有任何历史事件。市场平静得不太正常。`
+            : null,
+        );
+      } else {
+        setSkipNote(null);
+      }
       forceRender((n) => n + 1);
+      return advanced;
     },
     [],
   );
+
+  /**
+   * 快进到下一个事件。
+   *
+   * 上限 MAX_EVENT_HUNT_DAYS 是必要的安全阀：危机后期事件稀疏
+   * （例如 2009 年年中可能连续几个月没有卡片触发），没有上限会一路跑到底。
+   */
+  const proceedToEvent = useCallback(() => {
+    proceed(MAX_EVENT_HUNT_DAYS, true);
+  }, [proceed]);
 
   const advanceDays = useCallback(
     (n: number) => {
@@ -115,6 +152,7 @@ export function App() {
       if (!e) return;
       const notional = Math.max(0, e.state.player.equity * fraction);
       if (notional < 1) return;
+      setSkipNote(null);
       e.submitByNotional(selected, side === 'buy' ? notional : -notional);
       forceRender((n) => n + 1);
     },
@@ -124,6 +162,7 @@ export function App() {
   const flatten = useCallback(() => {
     const e = engineRef.current;
     if (!e) return;
+    setSkipNote(null);
     for (const p of [...e.state.player.positions.values()]) {
       e.submitOrder({
         instrumentId: p.instrumentId,
@@ -333,7 +372,7 @@ export function App() {
         <button onClick={() => advanceDays(1)} disabled={engine.isOver} {...advance1Tip}>
           推进 1 天
         </button>
-        <button onClick={() => proceed(1, true)} disabled={engine.isOver} {...advanceEventTip}>
+        <button onClick={proceedToEvent} disabled={engine.isOver} {...advanceEventTip}>
           快进到事件
         </button>
         <button onClick={() => proceed(21, false)} disabled={engine.isOver} {...advanceMonthTip}>
@@ -465,6 +504,8 @@ export function App() {
               {h.text}
             </div>
           ))}
+
+          {skipNote && !engine.isOver && <div className="hint info">{skipNote}</div>}
 
           <div className="panel">
             <h3>新闻流</h3>
