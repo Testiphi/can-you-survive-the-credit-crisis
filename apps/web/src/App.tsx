@@ -15,6 +15,7 @@ import {
 } from '@cyscc/core';
 import { dataset } from './dataset.ts';
 import { KLineChart } from './KLineChart.tsx';
+import { EquityChart } from './EquityChart.tsx';
 
 const TRADABLE = INSTRUMENTS.filter((i) => i.sector !== 'index');
 const TABS = ['SPX', ...TRADABLE.map((i) => i.id)];
@@ -129,6 +130,23 @@ export function App() {
     [engine, selected, tickRef.current],
   );
 
+  // 净值曲线与「标普买入持有」基准。
+  // 基准按初始资金归一化，两条线才能放在同一尺度上比较。
+  const equityCurve = useMemo(
+    () => (engine ? engine.state.score.map((snap) => ({ time: snap.date, value: snap.equity })) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [engine, tickRef.current],
+  );
+
+  const benchmarkCurve = useMemo(() => {
+    if (!engine) return [];
+    const spxBars = engine.visibleBars('SPX');
+    const base = spxBars[0]?.close ?? 1;
+    const capital = engine.config.initialCapital;
+    return spxBars.map((b) => ({ time: b.date, value: (capital * b.close) / base }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, tickRef.current]);
+
   // ------------------------------------------------------------ 开始界面
 
   if (!started) {
@@ -193,6 +211,9 @@ export function App() {
   const s = engine.summary();
   const m = s.macro;
   const ret = s.equity / engine.config.initialCapital - 1;
+  // 相对「标普买入持有」的表现——这个游戏真正的记分方式
+  const benchNow = benchmarkCurve[benchmarkCurve.length - 1]?.value ?? engine.config.initialCapital;
+  const relVsBench = benchNow > 0 ? s.equity / benchNow - 1 : 0;
   const news = [...engine.state.news].reverse().slice(0, 40);
   const lateEvents = engine.state.firedEvents.slice(-3);
 
@@ -257,6 +278,29 @@ export function App() {
             ))}
           </div>
           <KLineChart bars={bars} instrumentId={selected} />
+
+          <div className="panel" style={{ marginTop: 10 }}>
+            <h3>净值曲线</h3>
+            <div className="curve-legend">
+              <span>
+                <i className="dot-eq" />
+                你的净值
+              </span>
+              <span>
+                <i className="dot-bm" />
+                标普买入持有
+              </span>
+              <span className="spacer" />
+              <span>
+                相对基准{' '}
+                <b className={relVsBench >= 0 ? 'pos' : 'neg'}>
+                  {relVsBench >= 0 ? '+' : ''}
+                  {pct(relVsBench)}
+                </b>
+              </span>
+            </div>
+            <EquityChart equity={equityCurve} benchmark={benchmarkCurve} />
+          </div>
 
           <div className="panel" style={{ marginTop: 10 }}>
             <h3>下单 · {selected}</h3>

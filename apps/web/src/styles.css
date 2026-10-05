@@ -359,3 +359,42 @@ tr.clickable:hover {
   line-height: 1.6;
   font-size: 12px;
 }
+
+/* 净值曲线的图例 */
+.curve-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+
+.curve-legend .spacer {
+  flex: 1;
+}
+
+.curve-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.curve-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+.curve-legend i.dot-eq {
+  background: var(--accent);
+}
+
+.curve-legend i.dot-bm {
+  background: repeating-linear-gradient(to right, var(--dim) 0 4px, transparent 4px 7px);
+}
+
+.curve-legend b {
+  font-weight: 600;
+}

@@ -2,12 +2,17 @@
 
 [![CI](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/ci.yml/badge.svg)](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/ci.yml)
 [![Deploy](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Testiphi/can-you-survive-the-credit-crisis/actions/workflows/deploy-pages.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > 一个以 2007–2009 年全球信贷危机为舞台的单人回合制交易模拟游戏。
 
-**在线试玩**：https://testiphi.github.io/can-you-survive-the-credit-crisis/
+## ▶️ 在线试玩
 
-**当前状态：引擎 + P0 原型可玩。** 90 张事件卡、47 个测试全绿，前端可构建部署。
+### **https://testiphi.github.io/can-you-survive-the-credit-crisis/**
+
+打开即玩，无需安装。选一个随机种子和难度，然后在 2007 年 1 月做出你的第一个决定。
+
+**当前状态**：引擎 + P0 原型可玩 —— 90 张事件卡、38 类传闻、47 个测试全绿。
 
 ---
 
