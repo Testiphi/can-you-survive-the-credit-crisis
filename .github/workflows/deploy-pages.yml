@@ -35,6 +35,12 @@ jobs:
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
+      # enablement: true 会尝试通过 API 自动启用 Pages（build type = workflow），
+      # 这样首次部署不需要手工去 Settings 里点。若权限不足则回落到手动启用。
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       # 引擎是发布的门槛：引擎测试或数据校验失败就不该上线
       - name: 引擎测试（零依赖，无需安装）
         run: node --test "packages/core/test/*.test.ts"
@@ -54,8 +60,6 @@ jobs:
         env:
           # 资源路径前缀：项目页面部署在 /<仓库名>/
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
-
-      - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
