@@ -121,6 +121,16 @@ export {
   type AgentStepResult,
 } from './agents.ts';
 export {
+  borrowQuote,
+  planRecall,
+  dynamicShortMarginRate,
+  DEFAULT_BORROW_SUPPLY_RATIO,
+  BASE_BORROW_FEE,
+  MAX_BORROW_FEE,
+  type BorrowQuote,
+  type BorrowQuoteInput,
+} from './securities-lending.ts';
+export {
   GameEngine,
   timelineOf,
   type Dataset,

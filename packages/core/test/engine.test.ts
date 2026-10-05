@@ -5,6 +5,7 @@ import { loadDataset } from '../src/load-node.ts';
 import { GameEngine } from '../src/engine.ts';
 import type { GameConfig } from '../src/types.ts';
 import { createAccount, applyFill, markToMarket, computeMaintenanceMargin, checkMargin, planLiquidation } from '../src/portfolio.ts';
+import { dynamicShortMarginRate } from '../src/securities-lending.ts';
 import type { Fill } from '../src/types.ts';
 
 const dataset = loadDataset();
@@ -273,25 +274,44 @@ test('做空禁令生效期间，金融股无法做空', () => {
 
 test('监管阶梯随空头集中度上升', () => {
   const e = makeEngine(baseConfig({ seed: 42, difficulty: 3, identity: 'bank', initialCapital: 5e9 }));
-  while (!e.isOver && e.state.date < '2008-06-01') e.advance();
-  // 巨额做空 LEH
-  e.submitOrder({ instrumentId: 'LEH', side: 'sell', quantity: 60_000_000, kind: 'market', submittedAt: e.state.date });
-  for (let i = 0; i < 5; i++) e.advance();
-  assert.ok(e.state.regulator.shortConcentration > 0.05, `空头集中度应超过 5%：${e.state.regulator.shortConcentration}`);
-  assert.ok(e.state.regulator.level >= 2, `监管等级应达到 L2：${e.state.regulator.level}`);
+  while (!e.isOver && e.state.date < '2007-02-01') e.advance();
+  // 持续做空 BSC（流通股仅 1.3 亿，5% 披露门槛相对容易达到）。
+  // 必须多回合累积——流动性模型不允许单笔吃下 5% 流通股，这是刻意设计。
+  let turns = 0;
+  while (!e.isOver && turns < 60 && e.state.regulator.shortConcentration <= 0.05) {
+    e.submitOrder({
+      instrumentId: 'BSC',
+      side: 'sell',
+      quantity: 5_000_000,
+      kind: 'market',
+      submittedAt: e.state.date,
+    });
+    e.advance();
+    turns++;
+  }
+  const conc = e.state.regulator.shortConcentration;
+  assert.ok(conc > 0.05, `空头集中度应超过 5%，实际 ${(conc * 100).toFixed(2)}%（${turns} 回合）`);
+  assert.ok(e.state.regulator.level >= 2, `监管等级应达到 L2，实际 L${e.state.regulator.level}`);
 });
 
-test('维修保证金倍数随监管等级上升（L3 起 ×1.5）', () => {
-  const e = makeEngine(baseConfig({ seed: 42, difficulty: 3, identity: 'bank', initialCapital: 5e9 }));
-  while (!e.isOver && e.state.date < '2008-06-01') e.advance();
-  const before = computeMaintenanceMargin(e.state.player, e.state.prices);
-  e.submitOrder({ instrumentId: 'LEH', side: 'sell', quantity: 60_000_000, kind: 'market', submittedAt: e.state.date });
-  for (let i = 0; i < 8; i++) e.advance();
-  if (e.state.regulator.level >= 3) {
-    const after = computeMaintenanceMargin(e.state.player, e.state.prices, { marginMultiplier: 1.5 });
-    assert.ok(after >= before);
+test('保证金倍数精确放大维持保证金要求', () => {
+  const e = makeEngine(baseConfig({ seed: 42, difficulty: 2, identity: 'hedge_fund', initialCapital: 1e8 }));
+  while (!e.isOver && e.state.date < '2007-02-01') e.advance();
+  for (let i = 0; i < 6; i++) {
+    e.submitOrder({ instrumentId: 'JPM', side: 'buy', quantity: 100_000, kind: 'market', submittedAt: e.state.date });
+    e.advance();
   }
-  assert.ok(e.state.regulator.level >= 2);
+  const base = computeMaintenanceMargin(e.state.player, e.state.prices);
+  const raised = computeMaintenanceMargin(e.state.player, e.state.prices, { marginMultiplier: 1.5 });
+  assert.ok(base > 0, '应有维持保证金要求');
+  assert.ok(Math.abs(raised / base - 1.5) < 1e-6, `倍数应精确为 1.5，实际 ${raised / base}`);
+});
+
+test('危机中空头维持保证金率被上调', () => {
+  // 平静期 0.30，压力 1.0 时 0.75
+  assert.equal(dynamicShortMarginRate(0), 0.3);
+  assert.ok(Math.abs(dynamicShortMarginRate(1) - 0.75) < 1e-9);
+  assert.ok(dynamicShortMarginRate(0.5) > dynamicShortMarginRate(0.2));
 });
 
 test('爆仓后 isOver 为真', () => {

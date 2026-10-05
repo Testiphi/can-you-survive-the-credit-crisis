@@ -36,11 +36,13 @@ export function generateBar(
   const betaPart = def.beta * spxReturn;
   // 特质成分
   const idio = def.idioVol * rng.normal();
-  // 跳跃成分：危机期密度与幅度都上升（见 docs/03 §1.2）
+  // 跳跃成分：**对称的尾部跳空**，不做系统性漂移。
+  //
+  // 早期版本给跳跃加了 −6%·stress 的负漂移，结果与 beta 双重计入了危机：
+  // 系统性下跌本来就应该由 beta × SPX 承担，个股跳跃只负责「肥尾」。
+  // 两者叠加会让金融股在 2009 年底跌到真实水平的 5%（实测 GS $8）。
   const lambdaPerYear = 2 + 28 * macro.systemicStress;
-  const jump = rng.jump(lambdaPerYear / 252)
-    ? rng.gaussian(-0.01 - 0.06 * macro.systemicStress, 0.04)
-    : 0;
+  const jump = rng.jump(lambdaPerYear / 252) ? rng.gaussian(0, def.idioVol * 2.5) : 0;
 
   const ret = clamp(betaPart + idio + jump + extraReturn, -MAX_DAILY_RETURN, MAX_DAILY_RETURN);
   const close = Math.max(0.01, prevClose * (1 + ret));
@@ -108,6 +110,11 @@ export interface ExecutionInput {
   params: ExecutionParams;
   /** 惩罚性滑点倍数（强平用 2×） */
   slippagePenalty?: number;
+  /**
+   * 该标的允许的**最大空头总股数**（绝对量，不是剩余额度）。
+   * undefined 表示不做券源约束。见 securities-lending.ts。
+   */
+  maxShortQty?: number;
 }
 
 /**
@@ -129,8 +136,11 @@ export function executeOrder(input: ExecutionInput): Fill {
     reason: 'ok',
   };
 
+  let requestedQty = Math.max(0, order.quantity);
+  let clampedByBorrow = false;
+
   // ---- 可交易性检查 ----
-  const isShorting = order.side === 'sell' && currentQty - order.quantity < 0;
+  const isShorting = order.side === 'sell' && currentQty - requestedQty < 0;
   if (isShorting) {
     if (params.shortBanned.has(order.instrumentId)) {
       return { ...base, reason: 'not_shortable' };
@@ -138,13 +148,28 @@ export function executeOrder(input: ExecutionInput): Fill {
     if (!shortable) {
       return { ...base, reason: 'not_shortable' };
     }
+    // 券源约束：只能借到有限的券
+    if (input.maxShortQty !== undefined) {
+      const currentShort = Math.max(0, -currentQty);
+      const headroom = Math.max(0, input.maxShortQty - currentShort);
+      if (headroom <= 0) {
+        return { ...base, reason: 'not_shortable' };
+      }
+      if (requestedQty > headroom) {
+        requestedQty = Math.floor(headroom);
+        clampedByBorrow = true;
+      }
+    }
   }
-  if (order.side === 'buy' && currentQty >= 0 && order.quantity <= 0) {
+  if (order.side === 'buy' && currentQty >= 0 && requestedQty <= 0) {
     return { ...base, reason: 'no_position' };
+  }
+  if (requestedQty <= 0) {
+    return { ...base, reason: 'insufficient_liquidity' };
   }
 
   // ---- 市场容量与部分成交 ----
-  const notional = order.quantity * openPrice;
+  const notional = requestedQty * openPrice;
   const capacity = Math.max(1, adv20 * liquidity);
   const ratio = notional / capacity;
 
@@ -157,7 +182,7 @@ export function executeOrder(input: ExecutionInput): Fill {
   // 危机中的额外容量约束：流动性越低越难成交
   fillFraction *= Math.min(1, 0.35 + 0.65 * liquidity);
 
-  const filledQty = Math.max(0, Math.floor(order.quantity * fillFraction));
+  const filledQty = Math.max(0, Math.floor(requestedQty * fillFraction));
   if (filledQty === 0) {
     return { ...base, reason: 'insufficient_liquidity' };
   }
@@ -177,7 +202,7 @@ export function executeOrder(input: ExecutionInput): Fill {
     quantity: filledQty,
     impact,
     commission,
-    reason: fillFraction < 1 ? 'partial' : 'ok',
+    reason: clampedByBorrow || fillFraction < 1 ? 'partial' : 'ok',
   };
 }
 

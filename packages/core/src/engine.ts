@@ -50,6 +50,7 @@ import {
   planLiquidation,
 } from './portfolio.ts';
 import { computeRepoState, forcedSaleNotional, repoEnabled } from './repo.ts';
+import { borrowQuote, dynamicShortMarginRate, planRecall } from './securities-lending.ts';
 import {
   addRule,
   bannedShortScope,
@@ -82,6 +83,15 @@ export interface EngineOptions {
 }
 
 const COMMISSION_RATE = 0.0005;
+
+/**
+ * 事件卡 indexReturn 的施加系数。
+ *
+ * 基础路径本身就是历史锚点（已经包含崩盘），事件的市场冲击只应承担
+ * 「再计时」职责——让价格在抖动后的日期上做出反应——而不是再叠加一次完整跌幅。
+ * 1.0 会让标普在基础路径之上再跌 45%，个股则被系统性多杀一倍。
+ */
+const INDEX_SHOCK_SCALE = 0.15;
 
 /** 机构 id → 可交易标的 id（用于 SRS 的敞口计算） */
 function buildInstitutionTickerMap(): Record<string, string> {
@@ -282,9 +292,10 @@ export class GameEngine {
     this.state.date = nextDate;
     this.state.turnIndex += 1;
 
-    // ---- 1) 衰减既有冲击 ----
+    // ---- 1) 衰减既有状态修正，并清空本回合的收益冲击 ----
     for (const e of this.state.activeEffects) e.remaining -= 1;
     this.state.activeEffects = this.state.activeEffects.filter((e) => e.remaining > 0);
+    this.returnShock = { index: 0, perInstrument: new Map() };
 
     // ---- 2) 事件注入 ----
     const ctx = this.buildContext(base);
@@ -304,6 +315,7 @@ export class GameEngine {
 
     // ---- 3) 汇总修正量 ----
     const mods = this.aggregateModifiers();
+    this.activeBorrowMult = mods.borrowMult;
 
     // ---- 4) 宏观状态（基础路径 + 事件修正） ----
     // TED 利差不由事件卡直接驱动，而是由信用利差的上行推导出来——
@@ -358,7 +370,7 @@ export class GameEngine {
     for (const inst of INSTRUMENTS) {
       const prevClose = this.state.prices.get(inst.id) ?? inst.startPrice;
       const extra =
-        mods.perInstrument.get(inst.id) ??
+        (mods.perInstrument.get(inst.id) ?? 0) +
         flowToReturn(
           agentFlow.get(inst.id) ?? 0,
           this.adv20.get(inst.id) ?? inst.baseAdv,
@@ -376,15 +388,27 @@ export class GameEngine {
         this.adv20.get(inst.id) ?? inst.baseAdv,
         extra,
       );
+
+      // 已死亡机构（破产 / 被接管 / 被收购）的股票必须**单向衰减**。
+      // 否则它会像活着的公司一样随机游走，甚至「恢复」——
+      // 实测雷曼在破产一年后中位数回到 $4.50、上限 $34.87，这显然荒谬。
+      // 现实中这些权益归零后在粉单市场以仙股价格阴跌。
+      const failed = this.state.institutions[inst.id]?.alive === false;
+      if (failed) {
+        bar.close = round2(Math.max(0.01, Math.min(bar.close, prevClose * 0.97)));
+        bar.high = round2(Math.max(bar.open, bar.close));
+        bar.low = round2(Math.max(0.01, Math.min(bar.open, bar.close, bar.low)));
+      }
+
       newBars.set(inst.id, bar);
       this.adv20.set(inst.id, bar.adv20);
     }
 
-    // 标普价格由基础路径决定（指数不接受个股的 equityReturn）
+    // 标普价格 = 基础路径 × 累计事件冲击乘数
     const spxBars = this.state.bars.get('SPX')!;
     const prevSpxClose = spxBars[spxBars.length - 1].close;
     const spxBar = newBars.get('SPX')!;
-    spxBar.close = round2(Math.max(1, base.spx * (1 + mods.indexReturn + spxFlowImpact)));
+    spxBar.close = round2(Math.max(1, base.spx * this.indexShockMultiplier));
     spxBar.open = round2(prevSpxClose * (1 + spxReturn * 0.4));
     spxBar.high = round2(Math.max(spxBar.open, spxBar.close) * 1.004);
     spxBar.low = round2(Math.min(spxBar.open, spxBar.close) * 0.996);
@@ -402,16 +426,12 @@ export class GameEngine {
     // ---- 7) 成交（t+1 开盘价） ----
     const fills = this.executePending(newBars, nextDate);
 
-    // ---- 8) 借券费与盯市 ----
-    // 借券费随危机与做空拥挤度飙升（见 docs/07 §5.4）：
-    // 这是「做空不是免费午餐」的第一道成本约束。
-    // 历史：2008 年金融股借券费年化可达 20% 以上。
-    const borrowMult = mods.borrowMult * (1 + 40 * this.state.macro.systemicStress);
-    for (const pos of this.state.player.positions.values()) {
-      if (pos.quantity < 0) {
-        pos.borrowFeeRate = Math.min(0.6, 0.005 * borrowMult);
-      }
-    }
+    // ---- 8) 证券借贷：借券费与强制回补 ----
+    // 做空不是免费午餐。三重摩擦（见 securities-lending.ts）：
+    //   ① 借券费随利用率二次上升，且危机中放大
+    //   ② 可借券规模有上限，危机中收缩
+    //   ③ 出借人可以召回 → 强制回补 → 在反弹中被逼空
+    this.settleSecuritiesLending(nextDate, fills, spxReturn);
     accrueBorrowFees(this.state.player, this.state.prices);
     markToMarket(this.state.player, this.state.prices);
 
@@ -497,10 +517,48 @@ export class GameEngine {
     // 幅度抖动：impact × (1 + ε)，见 docs/02 §7.2
     const jittered = this.scenario.jitterImpact(card, this.streams.scenario) as ImpactVector;
 
+    // ---- 收益冲击：一次性即期施加 ----
+    //
+    // `equityReturn` / `indexReturn` 在 docs/02 里的语义是「**即期**收益冲击」。
+    // 早前版本把它们当作持续每日收益、按 decayDays 衰减地反复施加，
+    // 结果是 new_century_collapse 的 −4.2% 行业传染连续 12 天天天生效，
+    // 累计 −38%——金融股在 2007 年年中就全部穿零（实测 GS 跌到 $0.01）。
+    //
+    // 正确的做法：收益冲击当回合一次性吃掉；只有**状态**类修正
+    // （信用利差 / 波动率 / 流动性 / 融资）才按 decayDays 衰减。
+    //
+    // 另外，`indexReturn` 会被 INDEX_SHOCK_SCALE 缩减后再施加：
+    // 基础路径本身就是历史（已经包含崩盘），事件的市场冲击只应承担
+    // 「再计时」（让价格在抖动后的日期上反应），不该再叠加一次完整跌幅。
+    const rawIndex = jittered.indexReturn ?? 0;
+    const scaledIndex = rawIndex * INDEX_SHOCK_SCALE;
+    this.returnShock.index += scaledIndex;
+    // SPX 与个股一样**永久**累积事件冲击。
+    // 早前 SPX 的收盘价每天被基础路径拉回，冲击当天就蒸发了，
+    // 而个股却把冲击永久留在价格里——两者不一致，
+    // 结果是标普贴合历史、个股被系统性多杀一倍。
+    this.indexShockMultiplier *= 1 + scaledIndex;
+
+    const resolved = resolveImpact(jittered);
+    for (const [id, v] of resolved.perInstrument) {
+      this.returnShock.perInstrument.set(id, (this.returnShock.perInstrument.get(id) ?? 0) + v);
+    }
+
+    // ---- 状态类修正：按 decayDays 衰减 ----
+    const stateImpact: ImpactVector = {
+      decayDays: card.impact.decayDays,
+      creditSpreadDelta: jittered.creditSpreadDelta,
+      volMultiplier: jittered.volMultiplier,
+      liquidityMultiplier: jittered.liquidityMultiplier,
+      borrowFeeMultiplier: jittered.borrowFeeMultiplier,
+      marginRequirementMultiplier: jittered.marginRequirementMultiplier,
+      shortableRestriction: jittered.shortableRestriction,
+    };
+
     this.state.activeEffects.push({
       eventId: card.id,
       appliedOn: this.state.date,
-      impact: jittered,
+      impact: stateImpact,
       remaining: card.impact.decayDays,
       total: card.impact.decayDays,
     });
@@ -576,7 +634,6 @@ export class GameEngine {
     for (const e of this.state.activeEffects) {
       const w = e.total > 0 ? e.remaining / e.total : 0;
       const im = e.impact;
-      indexReturn += (im.indexReturn ?? 0) * w;
       creditBump += (im.creditSpreadDelta ?? 0) * w;
 
       // 乘数类字段用「最强事件主导」而不是连乘。
@@ -586,11 +643,12 @@ export class GameEngine {
       borrowMult = Math.max(borrowMult, 1 + ((im.borrowFeeMultiplier ?? 1) - 1) * w);
       marginMult = Math.max(marginMult, 1 + ((im.marginRequirementMultiplier ?? 1) - 1) * w);
       if (im.shortableRestriction) shortableRestricted = true;
+    }
 
-      const resolved = resolveImpact(im);
-      for (const [id, v] of resolved.perInstrument) {
-        perInstrument.set(id, (perInstrument.get(id) ?? 0) + v * w);
-      }
+    // 收益冲击是本回合一次性注入的（见 applyEvent），不随 decayDays 重复施加
+    indexReturn = this.returnShock.index;
+    for (const [id, v] of this.returnShock.perInstrument) {
+      perInstrument.set(id, v);
     }
 
     // 流动性乘数的下限：允许严重收缩，但不允许归零
@@ -614,15 +672,33 @@ export class GameEngine {
       const inst = INSTRUMENT_BY_ID.get(order.instrumentId);
       if (!bar || !inst) continue;
 
+      // 券源约束：只能借到有限的券（见 securities-lending.ts）。
+      // 注意传的是**绝对容量** capacityShares，不是 headroomShares——
+      // executeOrder 内部会自己减去当前空头。早前传 headroomShares 导致
+      // 容量被减了两次，做空只能做到可用券源的一半。
+      const currentQty = positionQty(this.state.player, order.instrumentId);
+      let maxShortQty: number | undefined;
+      if (order.side === 'sell') {
+        const quote = borrowQuote({
+          instrumentId: order.instrumentId,
+          floatShares: inst.sharesOutstanding,
+          price: bar.open,
+          currentShortQty: Math.max(0, -currentQty),
+          stress: this.state.macro.systemicStress,
+        });
+        maxShortQty = quote.capacityShares;
+      }
+
       const fill = executeOrder({
         order,
         openPrice: bar.open,
         adv20: bar.adv20,
         liquidity: this.state.macro.liquidity,
         dailyVol: inst.idioVol + 0.01,
-        currentQty: positionQty(this.state.player, order.instrumentId),
+        currentQty,
         shortable: inst.shortable,
         rng: this.streams.market,
+        maxShortQty,
         params: {
           eta: diff.impactEta,
           marginRate: 0.25,
@@ -707,9 +783,106 @@ export class GameEngine {
     markToMarket(this.state.player, this.state.prices);
   }
 
+  /**
+   * 证券借贷结算：更新借券费，并在出借人召回时执行强制回补。
+   *
+   * 这是做空策略的**尾部风险来源**。没有它，高利用率空头的收益分布会过窄
+   * （实测：全仓做空的分布只有 3.3 个百分点宽，结果几乎确定）。
+   */
+  private settleSecuritiesLending(date: string, fills: Fill[], spxReturn: number): void {
+    const stress = this.state.macro.systemicStress;
+    const diff = DIFFICULTY_PROFILE[this.config.difficulty];
+    const mods = this.activeBorrowMult;
+
+    for (const pos of [...this.state.player.positions.values()]) {
+      if (pos.quantity >= 0) continue;
+      const def = INSTRUMENT_BY_ID.get(pos.instrumentId);
+      const price = this.state.prices.get(pos.instrumentId);
+      if (!def || !price) continue;
+
+      const quote = borrowQuote({
+        instrumentId: pos.instrumentId,
+        floatShares: def.sharesOutstanding,
+        price,
+        currentShortQty: Math.abs(pos.quantity),
+        stress,
+        borrowMult: mods,
+        marketReturnToday: spxReturn,
+      });
+
+      // ① 借券费随利用率与压力上升
+      pos.borrowFeeRate = quote.feeRate;
+
+      // ② 出借人召回 → 强制回补
+      if (quote.recallRisk > 0 && this.streams.market.chance(quote.recallRisk)) {
+        const { quantity, penalty } = planRecall(Math.abs(pos.quantity), this.streams.market);
+        if (quantity > 0) {
+          const fill = executeOrder({
+            order: {
+              instrumentId: pos.instrumentId,
+              side: 'buy',
+              quantity,
+              kind: 'market',
+              submittedAt: date,
+            },
+            openPrice: price,
+            adv20: this.state.bars.get(pos.instrumentId)?.slice(-1)[0]?.adv20 ?? 1e9,
+            liquidity: this.state.macro.liquidity,
+            dailyVol: def.idioVol + 0.01,
+            currentQty: pos.quantity,
+            shortable: true,
+            rng: this.streams.market,
+            params: {
+              eta: diff.impactEta,
+              marginRate: 0.25,
+              commissionRate: COMMISSION_RATE,
+              shortBanned: new Set(),
+            },
+            // 逼空：你必须在所有人都知道你在买的时候买
+            slippagePenalty: penalty,
+          });
+          if (fill.quantity > 0) {
+            fill.filledAt = date;
+            applyFill(this.state.player, fill, date);
+            fills.push(fill);
+            this.state.news.push({
+              id: `recall-${pos.instrumentId}-${date}`,
+              date,
+              headline: `${pos.instrumentId} 的借券被出借人召回，你的空头被强制回补 ${fill.quantity.toLocaleString('en-US')} 股`,
+              body: `成交价 ${fill.price.toFixed(2)}，含 ${penalty.toFixed(1)} 倍惩罚性滑点。当出借人要求归还证券时，你无权协商——只能在市场上买入。`,
+              source: 'system',
+              credibility: 1,
+              isTrue: true,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  /** 本回合事件带来的借券费倍数，由 aggregateModifiers 写入。 */
+  private activeBorrowMult = 1;
+
+  /**
+   * 本回合一次性注入的收益冲击。
+   * 每回合开始时清空，由 applyEvent 填充，aggregateModifiers 消费。
+   */
+  private returnShock: { index: number; perInstrument: Map<string, number> } = {
+    index: 0,
+    perInstrument: new Map(),
+  };
+
+  /** SPX 的累计事件冲击乘数（永久累积，与个股行为一致）。 */
+  private indexShockMultiplier = 1;
+
   private settleMargin(newBars: Map<string, Bar>, date: string, fills: Fill[]): void {
     const marginMult = derivedMarginMultiplier(this.state.regulator);
-    const mm = computeMaintenanceMargin(this.state.player, this.state.prices, { marginMultiplier: marginMult });
+    // 危机中交易所与券商会同时上调空头保证金率
+    const shortMarginRate = dynamicShortMarginRate(this.state.macro.systemicStress);
+    const mm = computeMaintenanceMargin(this.state.player, this.state.prices, {
+      marginMultiplier: marginMult,
+      shortMarginRate,
+    });
     this.state.player.maintenanceMargin = mm;
 
     const { status, deficit } = checkMargin(this.state.player, this.state.prices, mm);

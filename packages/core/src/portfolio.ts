@@ -126,6 +126,12 @@ export function netExposure(account: Account, prices: Map<string, number>): Mone
 export interface MarginParams {
   /** 规则导致的保证金倍数（如 margin_hike） */
   marginMultiplier: number;
+  /**
+   * 空头维持保证金率。默认 SHORT_MARGIN_RATE。
+   * 危机中由 dynamicShortMarginRate(stress) 上调——这是
+   * 「你在反弹中被追保、然后被强平」的机制来源。
+   */
+  shortMarginRate?: number;
 }
 
 /** 维持保证金要求。做空按更高的比率计提。 */
@@ -134,10 +140,11 @@ export function computeMaintenanceMargin(
   prices: Map<string, number>,
   params: MarginParams = { marginMultiplier: 1 },
 ): Money {
+  const shortRate = params.shortMarginRate ?? SHORT_MARGIN_RATE;
   let mm = 0;
   for (const pos of account.positions.values()) {
     const p = prices.get(pos.instrumentId) ?? pos.avgPrice;
-    const rate = pos.quantity < 0 ? SHORT_MARGIN_RATE : DEFAULT_MARGIN_RATE;
+    const rate = pos.quantity < 0 ? shortRate : DEFAULT_MARGIN_RATE;
     mm += Math.abs(pos.quantity) * p * rate;
   }
   return mm * params.marginMultiplier;

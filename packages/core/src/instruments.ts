@@ -78,7 +78,7 @@ export const INSTRUMENTS: InstrumentDef[] = [
     id: 'GS',
     name: '高盛',
     sector: 'financials',
-    beta: 1.5,
+    beta: 1.3,
     idioVol: 0.019,
     startPrice: 200.0,
     sharesOutstanding: 4.3e8,
@@ -183,13 +183,30 @@ export interface ImpactResolution {
 }
 
 /**
+ * 行业传染的衰减系数。
+ *
+ * 这是本作数值模型里最重要的一个修正。
+ *
+ * `equityReturn` 语义上表示「**被点名的那家机构**的即期冲击」。
+ * 事件卡的 targets 经常形如 `["LEH", "SPX", "financials"]`——
+ * 如果行业名也吃满 `equityReturn`，`lehman_collapse` 的 −94% 就会把
+ * 高盛、摩根大通、花旗在同一天全部打掉 94%，几十个事件叠加之后
+ * 整个金融板块会在 2007 年年中就归零（实测：GS 跌到 $0.01），
+ * 而历史上高盛从峰值到谷底只跌了约 70%，且活了下来。
+ *
+ * 行业整体的下跌应该主要由市场因子（beta）承担，
+ * 事件卡只贡献一个衰减的传染分量。
+ */
+export const SECTOR_CONTAGION_DAMPING = 0.02;
+
+/**
  * 把一个 ImpactVector 解析成逐标的的价格冲击。
  *
  * 规则：
- *  - targets 含 'SPX' → 应用 indexReturn
- *  - targets 含行业名（financials 等）→ 该行业全部标的应用 equityReturn
- *  - targets 含具体代码 → 该标的应用 equityReturn
- *  - targets 为空 → 只影响 SPX（indexReturn）
+ *  - targets 含 'SPX'            → 应用 indexReturn
+ *  - targets 含具体代码           → 该标的应用 **全额** equityReturn
+ *  - targets 含行业名（financials 等）→ 该行业全部标的应用 equityReturn × 衰减系数
+ *  - targets 为空                 → 只影响 SPX（indexReturn）
  */
 export function resolveImpact(impact: ImpactVector): ImpactResolution {
   const perInstrument = new Map<string, number>();
@@ -201,14 +218,19 @@ export function resolveImpact(impact: ImpactVector): ImpactResolution {
     return { index, perInstrument };
   }
 
+  const named = new Set(targets.filter((t) => INSTRUMENT_BY_ID.has(t) && t !== 'SPX'));
+
   for (const target of targets) {
     if (target === 'SPX') continue; // 由 index 处理
+
     const sector = SECTOR_TARGETS[target];
     if (sector) {
+      const contagion = equity * SECTOR_CONTAGION_DAMPING;
       for (const inst of INSTRUMENTS) {
-        if (inst.sector === sector) {
-          perInstrument.set(inst.id, (perInstrument.get(inst.id) ?? 0) + equity);
-        }
+        if (inst.sector !== sector) continue;
+        // 已被点名的标的吃全额，不重复叠加传染分量
+        if (named.has(inst.id)) continue;
+        perInstrument.set(inst.id, (perInstrument.get(inst.id) ?? 0) + contagion);
       }
       continue;
     }
