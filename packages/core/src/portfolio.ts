@@ -51,20 +51,30 @@ export function applyFill(account: Account, fill: Fill, date: string): void {
     if (newQty === 0) {
       // 完全平仓
       account.positions.delete(id);
-    } else if (existing.quantity * newQty > 0) {
-      // 同向加仓：加权平均更新成本
-      const totalCost =
-        existing.avgPrice * Math.abs(existing.quantity) + fill.price * Math.abs(signedQty);
-      existing.avgPrice = totalCost / Math.abs(newQty);
-      existing.quantity = newQty;
     } else if (existing.quantity * newQty < 0) {
       // 穿越零：反向开仓，成本重置为本次成交价
       existing.quantity = newQty;
       existing.avgPrice = fill.price;
       existing.openedAt = date;
       existing.borrowFeeRate = newQty < 0 ? 0.005 : 0;
+    } else if (Math.abs(newQty) > Math.abs(existing.quantity)) {
+      // 同向**加仓**：加权平均更新成本
+      const totalCost =
+        existing.avgPrice * Math.abs(existing.quantity) + fill.price * Math.abs(signedQty);
+      existing.avgPrice = totalCost / Math.abs(newQty);
+      existing.quantity = newQty;
     } else {
-      // 部分平仓：成本价不变
+      // 同向**减仓**（部分平仓）：成本价不变。实现的盈亏通过现金体现。
+      //
+      // 这个分支是必需的，不能和「加仓」合并。早前只判断了同号/异号，
+      // 于是部分平仓也走进了加权平均公式——把**卖掉**的数量当成买入算进成本：
+      //
+      //     avg' = (avg×100 + price×30) / 70        （100 股里卖了 30 股）
+      //          = avg×1.4286 + price×0.4286
+      //
+      // 价格接近成本时，每部分平仓一次均价就乘上约 1.857。玩家反复用
+      // 「做空 25%」减仓，8 次之后成本就从 $1400 涨到 $201,934——
+      // 盈亏比例随之爆炸。
       existing.quantity = newQty;
     }
   }
