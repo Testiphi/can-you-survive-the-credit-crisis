@@ -71,24 +71,41 @@ export function borrowQuote(input: BorrowQuoteInput): BorrowQuote {
 
   // ① 可借券规模随危机收缩（出借方撤退）
   const supplyRatio = DEFAULT_BORROW_SUPPLY_RATIO * (1 - 0.6 * stress);
-  const capacityShares = Math.max(0, input.floatShares * supplyRatio);
+  // 没有流通股 = 不存在借券市场。指数属于这一类：
+  // 现实中做空大盘走的是期货/ETF，成本是融资成本（个位数年化）。
+  const borrowable = input.floatShares > 0;
+  const capacityShares = borrowable ? Math.max(0, input.floatShares * supplyRatio) : 0;
   const capacityNotional = capacityShares * input.price;
 
   const currentShort = Math.max(0, input.currentShortQty);
   const projectedShort = currentShort + Math.max(0, input.additionalQty ?? 0);
-  const utilization = capacityShares > 0 ? projectedShort / capacityShares : 1;
+  // 利用率只对「真的要去借券」的标的成立。
+  //
+  // 早前这里写成 `capacityShares > 0 ? ... : 1`，于是不可借券的标的
+  // 被记为「满负荷」，utilMult 直接吃满 4 倍：做空标普 500 在平静期
+  // 就要付 23%/年、危机期顶到 150%/年上限。实测在 2007-10-09 的历史
+  // 最高点做空并持有到 2009-12-31，指数跌了 28.7%，账户却净亏 5.96 万
+  // ——借券费 8.4 万，是毛收益的 3.3 倍。
+  const utilization = !borrowable ? 0 : capacityShares > 0 ? projectedShort / capacityShares : 1;
   const usedNotional = currentShort * input.price;
 
   // ② 借券费
   const utilMult = 1 + 3 * utilization * utilization;
-  const stressMult = 1 + 120 * stress;
+  // 压力敏感度：难借券的个股在危机中费率会飙升，但流动性好的名字不会。
+  //
+  // 早前对所有人用 1 + 120·stress，结果高盛这种从不难借的大票在 2008 年
+  // 也要付 33%/年（真实水平是个位数）。利用率才是区分「难借」与「好借」的
+  // 正确维度——它本来就是标的特有的——所以压力倍数应当温和，
+  // 让 utilMult 去做区分。
+  const stressMult = borrowable ? 1 + 20 * stress : 1 + 4 * stress;
   const feeRate = Math.min(
     MAX_BORROW_FEE,
     BASE_BORROW_FEE * utilMult * stressMult * (input.borrowMult ?? 1),
   );
 
-  // ③ 强制回补风险：高利用率 + 危机 + 反弹
-  const base = 0.0003 + 0.015 * utilization * utilization * stress;
+  // ③ 强制回补风险：高利用率 + 危机 + 反弹。
+  // 指数不会被「召回」——没有出借人。
+  const base = borrowable ? 0.0003 + 0.015 * utilization * utilization * stress : 0;
   const move = input.marketReturnToday ?? 0;
   const rallyMult = move > 0 ? 1 + 10 * move : 1;
   const recallRisk = Math.min(0.4, base * rallyMult);
