@@ -194,8 +194,18 @@ export function executeOrder(input: ExecutionInput): Fill {
   else if (ratio < 1) fillFraction = 0.3 + 0.4 * (1 - ratio);
   else fillFraction = 0.05;
 
-  // 危机中的额外容量约束：流动性越低越难成交
-  fillFraction *= Math.min(1, 0.35 + 0.65 * liquidity);
+  // 危机中的额外容量约束：流动性越低越难成交。
+  //
+  // 但只对**相对市场有分量**的订单生效。早前无条件折减，于是 D0 里
+  // 一笔 $10 万的标普小单（capacity 是 $500 亿，ratio ≈ 2e-6）也成交 69/70 股、
+  // 标记成 partial——玩家看到「买入 70 股，成交 69 股」只会认为是 bug。
+  //
+  // 现实中再糟的行情，很小的单子也总能成交。折减应当只作用在
+  // 那些真正会压垮容量的订单上。
+  const NEGLIGIBLE_RATIO = 0.01;
+  if (ratio >= NEGLIGIBLE_RATIO) {
+    fillFraction *= Math.min(1, 0.35 + 0.65 * liquidity);
+  }
 
   const filledQty = Math.max(0, Math.floor(requestedQty * fillFraction));
   if (filledQty === 0) {

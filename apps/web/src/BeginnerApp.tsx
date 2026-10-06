@@ -32,7 +32,7 @@ import type { Fill, GameEngine } from '@cyscc/core';
 
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
-import { buildHints } from './glossary.ts';
+import { buildHints, FILL_REASON } from './glossary.ts';
 
 /** D0 只保留两个标的——一个指数、一个单只股票。 */
 const D0_INSTRUMENTS: Array<{ id: string; name: string; hint: string; desc: string }> = [
@@ -353,16 +353,26 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
                 </div>
                 {trades.map((f, i) => {
                   const nm = D0_INSTRUMENTS.find((x) => x.id === f.order.instrumentId)?.name ?? f.order.instrumentId;
+                  const rejected = f.quantity <= 0;
                   return (
                     <div key={i} className="trade">
                       <span className="dim">{f.filledAt}</span>
                       <span className={f.order.side === 'buy' ? 'pos' : 'neg'}>
                         {f.order.side === 'buy' ? '买入' : '卖出'}
                       </span>
-                      <span>
-                        {nm} {f.quantity} 股
-                      </span>
-                      <span className="dim">@{f.price.toFixed(2)}</span>
+                      {rejected ? (
+                        // 显示「卖出 0 股」等于什么都没说。玩家必须知道为什么没成交。
+                        <span className="neg">
+                          {nm} · {FILL_REASON[f.reason] ?? f.reason}
+                        </span>
+                      ) : (
+                        <>
+                          <span>
+                            {nm} {f.quantity} 股
+                          </span>
+                          <span className="dim">@{f.price.toFixed(2)}</span>
+                        </>
+                      )}
                     </div>
                   );
                 })}

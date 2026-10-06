@@ -753,9 +753,15 @@ export class GameEngine {
       // 注意传的是**绝对容量** capacityShares，不是 headroomShares——
       // executeOrder 内部会自己减去当前空头。早前传 headroomShares 导致
       // 容量被减了两次，做空只能做到可用券源的一半。
+      //
+      // 但这条约束只适用于「借股票来卖」。指数没有流通股
+      // （SPX 的 sharesOutstanding 是 0），现实中做空大盘走的是期货/ETF，
+      // 不存在借券环节。早前无条件套用券源模型，结果 maxShortQty = 0，
+      // 做空标普 500 永远返回 not_shortable——而「做空大盘」恰恰是
+      // 这个游戏最核心的操作（最优策略就是先空后多）。
       const currentQty = positionQty(this.state.player, order.instrumentId);
       let maxShortQty: number | undefined;
-      if (order.side === 'sell') {
+      if (order.side === 'sell' && inst.sharesOutstanding > 0) {
         const quote = borrowQuote({
           instrumentId: order.instrumentId,
           floatShares: inst.sharesOutstanding,

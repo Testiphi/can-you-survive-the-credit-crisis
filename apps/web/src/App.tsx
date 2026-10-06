@@ -18,7 +18,7 @@ import { dataset } from './dataset.ts';
 import { KLineChart } from './KLineChart.tsx';
 import { EquityChart } from './EquityChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
-import { BUTTON_TIPS, GLOSSARY, buildHints } from './glossary.ts';
+import { BUTTON_TIPS, FILL_REASON, GLOSSARY, buildHints } from './glossary.ts';
 import { QuotePanel, computeQuote } from './QuotePanel.tsx';
 import { BeginnerApp } from './BeginnerApp.tsx';
 
@@ -69,6 +69,7 @@ export function App() {
   const [selected, setSelected] = useState('LEH');
   const [showMA, setShowMA] = useState(true);
   const [skipNote, setSkipNote] = useState<string | null>(null);
+  const [rejectNote, setRejectNote] = useState<string | null>(null);
 
   const engineRef = useRef<GameEngine | null>(null);
   const tickRef = useRef(0);
@@ -98,15 +99,23 @@ export function App() {
       if (!e) return 0;
       let advanced = 0;
       let fired = 0;
+      let rejected: string | null = null;
       for (let i = 0; i < steps; i++) {
         if (e.isOver) break;
         const res = e.advance();
         tickRef.current++;
         advanced++;
         fired += res.firedEventIds.length;
-        // 注意顺序：先推进再判断，因此触发事件的那一天本身也算推进
+        // 记录被拒绝/未成交的订单。早前这些失败完全静默——
+        // 玩家点了「做空」，什么也没发生，也没有任何提示。
+        for (const f of res.fills) {
+          if (!rejected && (f.quantity <= 0 || f.reason !== 'ok')) {
+            rejected = `${f.order.instrumentId}：${FILL_REASON[f.reason] ?? f.reason}`;
+          }
+        }
         if (stopOnEvent && res.firedEventIds.length > 0) break;
       }
+      setRejectNote(rejected);
       // 快进到事件却没撞上事件时给出明确反馈，
       // 否则玩家会以为按钮坏了（危机后期事件确实会变稀疏）
       if (stopOnEvent) {
@@ -537,6 +546,9 @@ export function App() {
           ))}
 
           {skipNote && !engine.isOver && <div className="hint info">{skipNote}</div>}
+          {rejectNote && (
+            <div className="hint warn">订单未成交 —— {rejectNote}</div>
+          )}
 
           <div className="panel">
             <h3>新闻流</h3>
