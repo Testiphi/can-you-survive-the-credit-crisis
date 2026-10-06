@@ -531,3 +531,342 @@ tr.clickable:hover {
   font-size: 11px;
   line-height: 1.6;
 }
+
+/* ---------------- D0 新手模式 ---------------- */
+
+.beginner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 16px 18px 40px;
+}
+
+.b-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 0 16px;
+  border-bottom: 1px solid #1a222d;
+  margin-bottom: 16px;
+}
+
+.b-date {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.b-date b {
+  font-size: 17px;
+  color: #fff;
+}
+
+.b-date .dim {
+  font-size: 11px;
+}
+
+.b-equity {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.b-equity .k {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.b-equity .v {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.b-equity .d {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.b-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .b-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.b-left,
+.b-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ---- 标的切换：只有两个，所以每个都写清「它是什么」 ---- */
+
+.b-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.b-tabs button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  padding: 10px 13px;
+  background: #10161f;
+  border: 1px solid #1f2733;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--dim);
+  text-align: left;
+}
+
+.b-tabs button b {
+  color: #cfdae6;
+  font-size: 13px;
+}
+
+.b-tabs button span {
+  font-size: 10.5px;
+}
+
+.b-tabs button.active {
+  border-color: var(--accent);
+  background: #101d2a;
+}
+
+.b-tabs button.active b {
+  color: var(--accent);
+}
+
+.b-quote {
+  background: #0d131b;
+  border: 1px solid #1f2733;
+  border-radius: 6px;
+  padding: 13px;
+}
+
+.b-quote-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.b-quote-head .nm {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.b-quote-head .px {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.b-quote-head .chg {
+  font-size: 13px;
+}
+
+.b-quote-foot {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.b-quote-foot .row {
+  display: flex;
+  gap: 10px;
+}
+
+.b-quote-foot .k {
+  color: #5a6b7c;
+  min-width: 34px;
+}
+
+.b-quote-foot .desc {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid #161d26;
+  line-height: 1.65;
+  color: #93a3b3;
+}
+
+/* ---- 四个大按钮：这是 D0 的全部操作面 ---- */
+
+.b-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+
+.b-actions .big {
+  padding: 16px 8px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.b-actions .big:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.b-actions .buy {
+  background: #10352a;
+  border-color: #1d6b52;
+  color: #4fe0a8;
+}
+
+.b-actions .buy:hover:not(:disabled) {
+  background: #16493a;
+}
+
+.b-actions .sell {
+  background: #35171a;
+  border-color: #6b2a2e;
+  color: #ff8b8f;
+}
+
+.b-actions .sell:hover:not(:disabled) {
+  background: #451f23;
+}
+
+.b-actions .wait {
+  background: #1a1f27;
+  border-color: #333d4a;
+  color: #a8b6c4;
+}
+
+.b-actions .wait:hover:not(:disabled) {
+  background: #232a34;
+}
+
+.b-actions .redeem {
+  background: #1c2431;
+  border-color: #35455c;
+  color: #9dc4f0;
+}
+
+.b-actions .redeem:hover:not(:disabled) {
+  background: #24303f;
+}
+
+.b-actions-note {
+  text-align: center;
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+/* ---- 模拟盘 ---- */
+
+.b-panel {
+  background: #0d131b;
+  border: 1px solid #1f2733;
+  border-radius: 6px;
+  padding: 13px;
+}
+
+.b-panel h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #cfdae6;
+}
+
+.b-acct {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.b-acct .line {
+  display: flex;
+  justify-content: space-between;
+}
+
+.b-acct .line span {
+  color: var(--dim);
+}
+
+.b-acct .line.total {
+  border-top: 1px solid #1a222d;
+  padding-top: 6px;
+  margin-top: 3px;
+}
+
+.b-acct .line.total b {
+  font-size: 15px;
+  color: #fff;
+}
+
+.b-holdings {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 11.5px;
+}
+
+.b-holdings th {
+  text-align: right;
+  color: #5a6b7c;
+  font-weight: 500;
+  padding-bottom: 5px;
+  font-size: 10.5px;
+}
+
+.b-holdings th:first-child {
+  text-align: left;
+}
+
+.b-holdings td {
+  text-align: right;
+  padding: 3px 0;
+  border-top: 1px solid #131a22;
+}
+
+.b-holdings td:first-child {
+  text-align: left;
+  color: #cfdae6;
+}
+
+.b-trades {
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px solid #1a222d;
+  font-size: 11px;
+}
+
+.b-trades .trade {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid #2b3849;
+  color: var(--dim);
+}
+
+.ghost:hover {
+  color: #cfdae6;
+  border-color: #3d4d61;
+}

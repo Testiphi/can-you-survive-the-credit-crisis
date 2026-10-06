@@ -145,3 +145,48 @@ test('historical 模式下核心叙事事件仍然全部发生', () => {
     assert.ok(fired.has(id), `historical 模式下 ${id} 必须触发`);
   }
 });
+
+// ---------------------------------------------------------------- 事件节流
+
+test('随机模式：单回合最多触发一个事件', () => {
+  // 早期一张卡一旦合格且投掷命中就会立刻触发，同一回合可能有多张同时命中——
+  // 实测 13% 的事件回合会一次弹出 2 个以上，最多 4 个。
+  // 对玩家而言是信息倾泻：点一次「快进到事件」，新闻流里突然多出四条头条。
+  for (const seed of [1, 7, 42]) {
+    const e = makeEngine({ timeline: 'jittered', seed });
+    let worst = 0;
+    while (!e.isOver) worst = Math.max(worst, e.advance().firedEventIds.length);
+    assert.equal(worst, 1, `seed ${seed} 出现了单回合 ${worst} 个事件`);
+  }
+});
+
+test('历史回放不节流：同一天多条头条是史实', () => {
+  // 2008-09-15 雷曼破产的同时美林被收购，真实历史就是这样。
+  // 忠实回放是 historical 模式的意义，节流只属于随机模式。
+  const e = makeEngine({ timeline: 'historical' });
+  let worst = 0;
+  while (!e.isOver) worst = Math.max(worst, e.advance().firedEventIds.length);
+  assert.ok(worst >= 2, `历史回放应保留同日多事件，实际最大 ${worst}`);
+});
+
+test('maxEventsPerTurn 可显式覆盖', () => {
+  const e = makeEngine({ timeline: 'jittered', seed: 7 }, { maxEventsPerTurn: 3 });
+  let worst = 0;
+  while (!e.isOver) worst = Math.max(worst, e.advance().firedEventIds.length);
+  assert.ok(worst >= 2, `放宽到 3 之后应该出现多事件回合，实际最大 ${worst}`);
+});
+
+// ---------------------------------------------------------------- D0 烟雾测试
+
+test('D0 难度可以完整跑完一局，且叙事完整', () => {
+  const e = makeEngine({ difficulty: 0, timeline: 'jittered' });
+  while (!e.isOver) e.advance();
+  assert.ok(e.state.turnIndex > 700, `应跑满全程，实际 ${e.state.turnIndex} 个交易日`);
+  assert.ok(
+    e.state.firedEvents.length > 70,
+    `D0 也应触发绝大多数事件卡，实际 ${e.state.firedEvents.length} / ${dataset.events.length}`,
+  );
+  for (const id of ['bear_stearns_collapse', 'lehman_collapse', 'aig_bailout']) {
+    assert.ok(e.state.firedEvents.includes(id), `D0 下 ${id} 必须触发`);
+  }
+});

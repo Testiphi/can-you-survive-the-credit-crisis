@@ -86,6 +86,8 @@ export interface EngineOptions {
   kappa?: number;
   /** 覆盖事件日期抖动幅度（交易日）。默认由时间线模式决定。 */
   jitterDays?: number;
+  /** 覆盖单回合最多触发的事件数。默认 1（避免新闻倾泻）。 */
+  maxEventsPerTurn?: number;
   /** 系统级事件的兜底触发余量（交易日） */
   forceFireMarginDays?: number;
   /** 关闭 NPC（用于单元测试与确定性回归） */
@@ -180,13 +182,19 @@ export class GameEngine {
       return ib - ia;
     };
 
+    // 三种时间线模式的真正区别：事件日期围绕史实日期的抖动幅度
+    const jitterDays = options.jitterDays ?? JITTER_BY_TIMELINE[this.config.timeline];
+
     this.scenario = new ScenarioEngine(dataset.events, dataset.institutions, {
       timeline: this.config.timeline,
       difficulty: this.config.difficulty,
       kappa: options.kappa ?? diff.hazardKappa,
       forceFireMarginDays: options.forceFireMarginDays ?? 10,
-      // 三种时间线模式的真正区别：事件日期围绕史实日期的抖动幅度
-      jitterDays: options.jitterDays ?? JITTER_BY_TIMELINE[this.config.timeline],
+      // 单回合事件数上限是**随机模式的节流阀**，历史回放不该受它约束：
+      // 真实历史里同一天本来就可能有多条头条（2008-09-15 雷曼破产 + 美林被收购），
+      // 忠实回放正是 historical 模式的意义。零抖动 ⇒ 不节流。
+      maxEventsPerTurn: options.maxEventsPerTurn ?? (jitterDays === 0 ? 0 : 1),
+      jitterDays,
       dayDiff,
     });
 

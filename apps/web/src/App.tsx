@@ -20,6 +20,7 @@ import { EquityChart } from './EquityChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
 import { BUTTON_TIPS, GLOSSARY, buildHints } from './glossary.ts';
 import { QuotePanel, computeQuote } from './QuotePanel.tsx';
+import { BeginnerApp } from './BeginnerApp.tsx';
 
 const TRADABLE = INSTRUMENTS.filter((i) => i.sector !== 'index');
 const TABS = ['SPX', ...TRADABLE.map((i) => i.id)];
@@ -34,10 +35,10 @@ const TABS = ['SPX', ...TRADABLE.map((i) => i.id)];
 const MAX_EVENT_HUNT_DAYS = 120;
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
-  0: 'D0 看懂危机（K线 + 成交量 + 新闻标题）',
-  1: 'D1 基本面（+ 利率 / TED / VIX / 信用利差）',
-  2: 'D2 专业层（+ 保证金 / 融资 / 回购折扣率）',
-  3: 'D3 太大而不能动（+ 监管约束与冲击成本）',
+  0: 'D0 · 新手模式（推荐第一次玩）',
+  1: 'D1 · 标准（宏观指标 + 完整标的）',
+  2: 'D2 · 进阶（加上融资与监管）',
+  3: 'D3 · 硬核（噪声、监管、冲击全开）',
 };
 
 const IDENTITY_LABEL: Record<Identity, string> = {
@@ -61,7 +62,7 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 export function App() {
   const [started, setStarted] = useState(false);
   const [seed, setSeed] = useState(42);
-  const [difficulty, setDifficulty] = useState<Difficulty>(1);
+  const [difficulty, setDifficulty] = useState<Difficulty>(0);
   const [identity, setIdentity] = useState<Identity>('retail');
   const [timeline, setTimeline] = useState<TimelineMode>('jittered');
   const [, forceRender] = useState(0);
@@ -291,14 +292,28 @@ export function App() {
             开始
           </button>
         </div>
-        {difficulty <= 1 && (
+        {difficulty === 0 && (
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
-            <b>新手建议先选 D0 或 D1。</b>
+            <b>D0 是新手模式：只有 2 个标的、4 个按钮。</b>
             {'\n\n'}
-            低难度不是「信息更少」，而是**同样的信息讲得更清楚**——
-            游戏里会把每个数字是什么意思、什么水平算危险都写给你。
+            你看不到 K 线、成交量、均线，也看不到任何宏观指标——不是藏起来，是
+            **那些东西在你还不熟悉这个游戏之前只会碍事**。
             {'\n\n'}
-            进游戏后，把鼠标停在任意按钮或指标名上，都会弹出说明。
+            你只需要：看新闻 → 在「买入 / 做空 / 观望 / 赎回」里选一个 →
+            时间自动前进到下一条新闻。**你永远不需要想「我该什么时候点推进」。**
+            {'\n\n'}
+            新闻一条都没有削减——那是这个游戏的全部意义。想看清全局数据时，
+            换 D1 或更高。
+          </div>
+        )}
+        {difficulty !== 0 && (
+          <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
+            <b>D1 及以上是标准模式：完整标的、K 线、宏观指标。</b>
+            {'\n\n'}
+            每个按钮、每个指标名都可以把鼠标停上去看说明。
+            {'\n\n'}
+            如果你是第一次玩，建议退回 <b>D0 新手模式</b>——先弄懂这个游戏在讲什么，
+            再来看这些数字。
           </div>
         )}
         <p style={{ marginTop: 22, fontSize: 11 }}>
@@ -310,6 +325,22 @@ export function App() {
   }
 
   if (!engine) return null;
+
+  // ---- D0 新手模式：换一套完全不同的交互模型，而不是「少显示几项」 ----
+  // 见 BeginnerApp.tsx 顶部的说明。这里只做分发。
+  if (engine.config.difficulty === 0) {
+    return (
+      <BeginnerApp
+        engine={engine}
+        onChange={() => forceRender((n) => n + 1)}
+        onRestart={() => {
+          setStarted(false);
+          engineRef.current = null;
+          forceRender((n) => n + 1);
+        }}
+      />
+    );
+  }
 
   const s = engine.summary();
   const m = s.macro;

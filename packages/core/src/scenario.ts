@@ -50,6 +50,18 @@ export interface ScenarioOptions {
   dayDiff?: (a: string, b: string) => number;
   /** 交易日位移函数（默认用 time.ts 的 shiftTradingDays），便于测试注入。 */
   shiftDays?: (d: string, n: number) => string;
+  /**
+   * 单回合最多触发几个事件。默认 1。
+   *
+   * 为什么需要上限：早期一张卡一旦「合格且投掷命中」就会立刻触发，
+   * 而同一回合可能有多张卡同时命中——实测有 13% 的事件回合会一次弹出
+   * 2 个以上，最多 4 个。对玩家而言这是**信息倾泻**：
+   * 点一次「快进到事件」，新闻流里突然多出四条头条，前因后果完全无法消化。
+   *
+   * 被挤掉的卡不会丢失——它们的窗口是几个月宽，下一个回合会重新投掷。
+   * 强制触发（兜底）的事件优先级最高，永远保留：它们是因果链的安全网。
+   */
+  maxEventsPerTurn?: number;
   /** 调试探针：每个回合回调一次合格事件列表。生产环境不要设置。 */
   debugProbe?: (info: {
     date: string;
@@ -386,6 +398,29 @@ export class ScenarioEngine {
 
         fired.push({ card, forced: true });
         nowFired.add(card.id);
+      }
+    }
+
+    // ---- 4) 单回合事件数上限 ----
+    // 强制触发的事件优先保留；其余按原顺序补足剩余名额。
+    const cap = this.opts.maxEventsPerTurn ?? 1;
+    if (cap > 0 && fired.length > cap) {
+      const keep = new Set<FireDecision>();
+      let slots = cap;
+      for (const f of fired) {
+        if (f.forced && slots > 0) {
+          keep.add(f);
+          slots--;
+        }
+      }
+      for (const f of fired) {
+        if (slots > 0 && !keep.has(f)) {
+          keep.add(f);
+          slots--;
+        }
+      }
+      for (let i = fired.length - 1; i >= 0; i--) {
+        if (!keep.has(fired[i])) fired.splice(i, 1);
       }
     }
 
