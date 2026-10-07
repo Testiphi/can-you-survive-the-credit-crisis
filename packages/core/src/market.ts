@@ -9,6 +9,8 @@ import type { Bar, DateStr, Fill, MacroState, Order } from './types.ts';
 import type { InstrumentDef } from './instruments.ts';
 import type { Rng } from './rng.ts';
 
+export const COMMISSION_RATE = 0.0005;
+
 /**
  * 随机成分的单日上限（防止 GBM 噪声数值爆炸）。
  *

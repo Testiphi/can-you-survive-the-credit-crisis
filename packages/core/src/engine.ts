@@ -46,7 +46,7 @@ import {
   updateConfidence,
 } from './institutions.ts';
 import { ScenarioEngine, JITTER_BY_TIMELINE, type FireDecision } from './scenario.ts';
-import { executeOrder, generateBar } from './market.ts';
+import { COMMISSION_RATE, executeOrder, generateBar } from './market.ts';
 import {
   accrueBorrowFees,
   applyFill,
@@ -100,8 +100,6 @@ export interface EngineOptions {
   /** 关闭传闻生成 */
   disableRumors?: boolean;
 }
-
-const COMMISSION_RATE = 0.0005;
 
 /**
  * 事件卡 indexReturn 的施加系数。

@@ -9,6 +9,8 @@ import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
 import { buildHints, FILL_REASON } from './glossary.ts';
 import { nextFundingDecision } from '@cyscc/core';
+import { previewBeginnerTrade } from '@cyscc/core';
+import { OrderPreview } from './OrderPreview.tsx';
 
 /** D0 只保留两个标的——一个指数、一个单只股票。 */
 const D0_INSTRUMENTS: Array<{ id: string; name: string; hint: string; desc: string }> = [
@@ -27,9 +29,9 @@ const D0_INSTRUMENTS: Array<{ id: string; name: string; hint: string; desc: stri
 ];
 
 const ACTIONS = {
-  buy: '买入\n\n按选定比例的现金提交买入；实际成交会预留手续费，并受新手持仓额度限制。\n\n价格涨了你赚钱，跌了你亏钱。银行角色还需偿还借款，请同时查看负债与净资产。',
+  buy: '买入方向\n\n按选定比例的现金提交订单；实际成交会预留手续费，并受持仓额度限制。\n\n已有空头时先回补，超出回补数量才建立多头；已有多头时增加持仓。请先查看预览中的方向与数量。',
   short:
-    '做空\n\n先借来卖出，等价格跌了再买回来还掉，赚差价。\n\n' +
+    '卖出方向\n\n已有多头时先减仓，卖出数量超过多头持仓后才建立空头。已有空头时继续增加空头。\n\n' +
     '价格跌你赚钱；**价格涨你亏钱，而且亏损没有上限**——因为股价理论上可以无限涨。\n\n' +
     '若已有同一标的的多头，会先卖出多头，剩余数量才建立空头。请以成交后持仓为准。',
   wait:
@@ -83,6 +85,8 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
   const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports, fund ?? bank ?? insurer);
   const lastReport = engine.turnReports.at(-1);
   const nextDecision = nextFundingDecision(engine.state);
+  const buyPreview = previewBeginnerTrade(engine.state, selected, 'buy', fraction);
+  const sellPreview = previewBeginnerTrade(engine.state, selected, 'sell', fraction);
   const inst = D0_INSTRUMENTS.find((i) => i.id === selected) ?? D0_INSTRUMENTS[0];
   const bars = useMemo(
     () => engine.visibleBars(selected),
@@ -124,13 +128,10 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
       if (e.isOver) return;
       const log: Fill[] = [];
 
-      if (kind === 'buy') {
-        // 按现金提交，开盘时由引擎按实际价格与账户额度裁剪。
-        const cash = Math.max(0, e.state.player.cash);
-        if (cash >= 1) e.submitByNotional(selected, cash * fraction);
-      } else if (kind === 'short') {
-        const equity = Math.max(0, e.state.player.equity);
-        if (equity >= 1) e.submitByNotional(selected, -equity * fraction);
+      if (kind === 'buy' || kind === 'short') {
+        const preview = previewBeginnerTrade(e.state, selected, kind === 'buy' ? 'buy' : 'sell', fraction);
+        if (!preview.order) { setStepNote(preview.note ?? '无法提交订单'); return; }
+        e.submitOrder(preview.order);
       } else if (kind === 'redeem') {
         for (const p of [...e.state.player.positions.values()]) {
           e.submitOrder({
@@ -321,17 +322,18 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
 
           {stepNote && <div className="banner info" role="status">{stepNote}</div>}
           <label className="b-actions-note">
-            本次交易比例（买入按现金，做空按净资产）：
+            本次交易比例（买入方向按现金，卖出方向按净资产）：
             <select value={fraction} disabled={engine.isOver} onChange={e => setFraction(Number(e.target.value))}>
               <option value={0.25}>25%</option><option value={0.5}>50%</option><option value={1}>100%</option>
             </select>
           </label>
+          {!engine.isOver && <OrderPreview buy={buyPreview} sell={sellPreview} />}
           <div className="b-actions">
-            <button className="big buy" onClick={() => act('buy')} disabled={engine.isOver} {...buyTip}>
-              买入
+            <button className="big buy" onClick={() => act('buy')} disabled={engine.isOver || !buyPreview.order} {...buyTip}>
+              {buyPreview.label}
             </button>
-            <button className="big sell" onClick={() => act('short')} disabled={engine.isOver} {...shortTip}>
-              做空
+            <button className="big sell" onClick={() => act('short')} disabled={engine.isOver || !sellPreview.order} {...shortTip}>
+              {sellPreview.label}
             </button>
             <button className="big wait" onClick={() => act('wait')} disabled={engine.isOver} {...waitTip}>
               观望
