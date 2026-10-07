@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { Fill, GameEngine } from '@cyscc/core';
-import { BEGINNER_RULES } from '@cyscc/core';
+import { BEGINNER_RULES, BEGINNER_CHAPTER, isBeginnerChapter, reviewRun } from '@cyscc/core';
 
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
@@ -26,11 +26,11 @@ const D0_INSTRUMENTS: Array<{ id: string; name: string; hint: string; desc: stri
 ];
 
 const ACTIONS = {
-  buy: '买入\n\n按现金提交买入；实际成交会预留手续费，并受新手持仓额度限制。\n\n价格涨了你赚钱，跌了你亏钱。最坏情况是亏光本金，不会更多。',
+  buy: '买入\n\n按选定比例的现金提交买入；实际成交会预留手续费，并受新手持仓额度限制。\n\n价格涨了你赚钱，跌了你亏钱。最坏情况是亏光本金，不会更多。',
   short:
     '做空\n\n先借来卖出，等价格跌了再买回来还掉，赚差价。\n\n' +
     '价格跌你赚钱；**价格涨你亏钱，而且亏损没有上限**——因为股价理论上可以无限涨。\n\n' +
-    '这是本作风险最高的动作。历史上靠做空危机发财的人确实存在，但他们也是在崩盘之前就下注的。',
+    '若已有同一标的的多头，会先卖出多头，剩余数量才建立空头。请以成交后持仓为准。',
   wait:
     '观望\n\n最多观望 5 个交易日；遇到事件、成交、追保或期间净值下跌 3% 时提前暂停。\n\n' +
     '**观望不是错误的决定。** 危机里可以保留现金，等待更清楚的信号。',
@@ -43,6 +43,7 @@ type ActionKind = keyof typeof ACTIONS;
 
 const money = (v: number) =>
   v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const exactMoney = (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${money(v)}`;
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
@@ -56,7 +57,8 @@ interface Props {
 
 export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props) {
   const [selected, setSelected] = useState('SPX');
-  const [trades, setTrades] = useState<Fill[]>([]);
+  const [trades, setTrades] = useState<Fill[]>(() => engine.turnReports.flatMap(r => r.fills).slice(-6));
+  const [fraction, setFraction] = useState(0.5);
   const [stepNote, setStepNote] = useState('');
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const engineRef = useRef(engine);
@@ -69,6 +71,9 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
   const restartTip = useTip('重开\n\n回到开始界面，重新选择种子、难度与时间线。');
 
   const s = engine.summary();
+  const chapter = isBeginnerChapter(engine.config);
+  const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports);
+  const lastReport = engine.turnReports.at(-1);
   const inst = D0_INSTRUMENTS.find((i) => i.id === selected) ?? D0_INSTRUMENTS[0];
   const bars = useMemo(
     () => engine.visibleBars(selected),
@@ -112,10 +117,10 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
       if (kind === 'buy') {
         // 按现金提交，开盘时由引擎按实际价格与账户额度裁剪。
         const cash = Math.max(0, e.state.player.cash);
-        if (cash >= 1) e.submitByNotional(selected, cash);
+        if (cash >= 1) e.submitByNotional(selected, cash * fraction);
       } else if (kind === 'short') {
         const equity = Math.max(0, e.state.player.equity);
-        if (equity >= 1) e.submitByNotional(selected, -equity);
+        if (equity >= 1) e.submitByNotional(selected, -equity * fraction);
       } else if (kind === 'redeem') {
         for (const p of [...e.state.player.positions.values()]) {
           e.submitOrder({
@@ -132,7 +137,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
       advanceSession(log, kind === 'wait' ? 5 : 1);
       bump();
     },
-    [selected, advanceSession],
+    [selected, fraction, advanceSession],
   );
 
   const hints = buildHints(engine).slice(0, 2);
@@ -168,6 +173,11 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
       </div>
 
       {storageNote && <div className="b-actions-note" role="status">{storageNote}</div>}
+      {chapter && <div className="banner info">
+        <b>{BEGINNER_CHAPTER.title}</b> · {engine.config.startDate} 至 {engine.config.endDate} · 剩余 {engine.isOver ? 0 : engine.remainingTurns} 个交易日
+        <p>目标：结束时保留至少 {money(engine.config.initialCapital * BEGINNER_CHAPTER.capitalFloor)} 净资产。
+        风控挑战：最大回撤不超过 30%，且不触发自动回补。保留现金同样可以完成目标。</p>
+      </div>}
       <div className="b-body">
         {/* ---------------- 左：行情与操作 ---------------- */}
         <div className="b-left">
@@ -224,7 +234,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           ))}
 
           {engine.isOver && !s.bankrupt && (
-            <div className="banner info">2009 年结束了。你活了下来——这在这个游戏里已经不算容易。</div>
+            <div className="banner info">本局已到达 {engine.config.endDate}。查看右侧复盘了解资金变化。</div>
           )}
           {s.bankrupt && (
             <div className="banner danger">
@@ -234,6 +244,12 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           )}
 
           {stepNote && <div className="banner info" role="status">{stepNote}</div>}
+          <label className="b-actions-note">
+            本次交易比例（买入按现金，做空按净资产）：
+            <select value={fraction} disabled={engine.isOver} onChange={e => setFraction(Number(e.target.value))}>
+              <option value={0.25}>25%</option><option value={0.5}>50%</option><option value={1}>100%</option>
+            </select>
+          </label>
           <div className="b-actions">
             <button className="big buy" onClick={() => act('buy')} disabled={engine.isOver} {...buyTip}>
               买入
@@ -260,6 +276,29 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
 
         {/* ---------------- 右：模拟盘与新闻 ---------------- */}
         <div className="b-right">
+          {lastReport && <div className="b-panel">
+            <h3>本回合资金变化 · {lastReport.date}</h3>
+            <div className="line">期初净资产：{exactMoney(lastReport.equityBefore)}</div>
+            <div className="line">持仓与交易价差：{lastReport.marketPnl >= 0 ? '+' : ''}{exactMoney(lastReport.marketPnl)}</div>
+            <div className="line">交易手续费：−{exactMoney(lastReport.commission)}</div>
+            <div className="line">做空持有费：−{exactMoney(lastReport.borrowFees)}</div>
+            <div className="line">期末净资产：{exactMoney(lastReport.equityAfter)}</div>
+          </div>}
+          {engine.isOver && <div className="b-panel">
+            <h3>本局复盘</h3>
+            <p>{s.bankrupt ? '账户已破产。' : '已完成本局。'} 净收益 {signed(s.equity - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
+            {chapter && <p>本金目标：{review.capitalPreserved && review.survived ? '完成' : '未完成'}；
+              回撤挑战：{review.drawdownControlled ? '完成' : '未完成'}；
+              避免自动回补：{review.noForcedClose ? '完成' : '未完成'}。</p>}
+            <p>累计手续费 {money(review.commissions)}，做空持有费 {money(review.borrowFees)}，自动回补 {review.riskCloses} 次。</p>
+            {review.worstDay && review.worstDay.equityAfter < review.worstDay.equityBefore && <p>
+              最大单日净损失发生在 {review.worstDay.date}：{money(review.worstDay.equityBefore - review.worstDay.equityAfter)}。
+              当日持仓与交易价差 {signed(review.worstDay.marketPnl)}，费用合计 {money(review.worstDay.commission + review.worstDay.borrowFees)}。
+              {review.worstDay.fills.some(f => f.reason === 'risk_close') ? '当日触及空头风险底线并自动回补。' : ''}
+            </p>}
+            <p>复盘只依据本局实际成交与每日净值，未把同时出现的新闻认定为损失的唯一原因。</p>
+          </div>}
+
           <div className="b-panel">
             <h3>
               <Tip
@@ -396,7 +435,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
                   )}
                   {n.headline}
                 </div>
-                <div className="body">{n.body}</div>
+                <div className="body">{n.source === 'historical' && !engine.isOver ? '历史后续与回顾解读将在本局结束后展示，避免提前透露行情。' : n.body}</div>
                 <div className="dim" style={{ fontSize: 10, marginTop: 4 }}>
                   {n.date}
                 </div>

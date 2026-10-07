@@ -8,6 +8,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   GameEngine,
+  BEGINNER_CHAPTER,
   INSTRUMENTS,
   LEVEL_LABEL,
   type Difficulty,
@@ -64,6 +65,7 @@ export function App() {
   const [seed, setSeed] = useState(42);
   const [difficulty, setDifficulty] = useState<Difficulty>(0);
   const [identity, setIdentity] = useState<Identity>('retail');
+  const [shortChapter, setShortChapter] = useState(true);
   const [timeline, setTimeline] = useState<TimelineMode>('jittered');
   const [, forceRender] = useState(0);
   const [selected, setSelected] = useState('LEH');
@@ -96,6 +98,9 @@ export function App() {
           difficulty: opts.difficulty,
           identity: opts.identity,
           timeline: opts.timeline,
+          ...(opts.difficulty === 0 && shortChapter ? {
+            startDate: BEGINNER_CHAPTER.startDate, endDate: BEGINNER_CHAPTER.endDate,
+          } : {}),
         },
       });
       tickRef.current = 0;
@@ -103,7 +108,7 @@ export function App() {
       persist(engineRef.current);
       forceRender((n) => n + 1);
     },
-    [persist],
+    [persist, shortChapter],
   );
 
   const engine = engineRef.current;
@@ -253,7 +258,7 @@ export function App() {
       <div className="setup">
         <h1>你能不能逃过信贷危机</h1>
         <p>
-          2007 年 1 月，你手握一笔资金。市场会崩，但你不知道哪天崩。
+          你手握一笔资金，进入信贷危机中的市场。选择短章节或完整复演，练习管理风险。
           <br />
           你只能看到今天及以前的信息——明天是未知的。
         </p>
@@ -305,6 +310,15 @@ export function App() {
               ))}
             </select>
           </label>
+          {difficulty === 0 && (
+            <label>
+              <span>游戏长度</span>
+              <select value={shortChapter ? 'chapter' : 'full'} onChange={e => setShortChapter(e.target.value === 'chapter')}>
+                <option value="chapter">短章节：2008 年 9—10 月（推荐）</option>
+                <option value="full">完整复演：2007—2009</option>
+              </select>
+            </label>
+          )}
           <button
             className="primary"
             {...startTip}

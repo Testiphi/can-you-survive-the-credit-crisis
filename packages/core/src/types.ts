@@ -385,6 +385,18 @@ export interface TurnResult {
   bankrupt: boolean;
 }
 
+export interface TurnReport {
+  date: DateStr;
+  equityBefore: Money;
+  equityAfter: Money;
+  /** 当日持仓估值和交易价差损益，未扣下列费用。 */
+  marketPnl: Money;
+  commission: Money;
+  borrowFees: Money;
+  fills: Fill[];
+  firedEventIds: string[];
+}
+
 // ---------------------------------------------------------------- 真实历史数据
 
 /** 数据管道产出的一根日线。 */

@@ -27,6 +27,7 @@ import type {
   PlayerAction,
   ScoreSnapshot,
   TurnResult,
+  TurnReport,
 } from './types.ts';
 import { DEFAULT_CONFIG, IDENTITY_PROFILE } from './types.ts';
 import { Rng, createStreams, type Streams } from './rng.ts';
@@ -135,6 +136,9 @@ export class GameEngine {
   private opts: EngineOptions;
   private actions: PlayerAction[] = [];
   private datasetHash: string;
+  private reports: TurnReport[] = [];
+
+  get turnReports(): readonly TurnReport[] { return this.reports; }
 
   /** 真实历史价格源。为 null 时全部标的走合成路径。 */
   private realPrices: RealPriceSource | null = null;
@@ -325,6 +329,7 @@ export class GameEngine {
 
     const diff = DIFFICULTY_PROFILE[this.config.difficulty];
     const nextDate = nextTradingDay(this.state.date);
+    const equityBefore = this.state.player.equity;
     const idx = this.macroIndexByDate.get(nextDate);
     const base: MacroState =
       idx !== undefined ? this.baseMacro[idx] : { ...this.baseMacro[this.baseMacro.length - 1], date: nextDate };
@@ -554,7 +559,7 @@ export class GameEngine {
     } else {
       this.settleSecuritiesLending(nextDate, fills, spxReturn);
     }
-    accrueBorrowFees(this.state.player, this.state.prices);
+    const borrowFees = accrueBorrowFees(this.state.player, this.state.prices);
     markToMarket(this.state.player, this.state.prices);
 
     // ---- 9) 回购融资与被迫卖出 ----
@@ -599,6 +604,13 @@ export class GameEngine {
     }
 
     this.prevPrices = new Map(this.state.prices);
+
+    const commission = fills.reduce((sum, fill) => sum + fill.commission, 0);
+    this.reports.push({
+      date: nextDate, equityBefore, equityAfter: this.state.player.equity,
+      marketPnl: this.state.player.equity - equityBefore + commission + borrowFees,
+      commission, borrowFees, fills: structuredClone(fills), firedEventIds: [...firedEventIds],
+    });
 
     return {
       date: nextDate,

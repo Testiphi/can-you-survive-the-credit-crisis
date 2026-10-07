@@ -103,7 +103,7 @@ export function SimpleChart({ bars, height = 260, instrumentId }: Props) {
     const start = bars[0].close;
     base.setData([
       { time: bars[0].date as Time, value: start },
-      { time: bars[bars.length - 1].date as Time, value: start },
+      ...(bars.length > 1 ? [{ time: bars[bars.length - 1].date as Time, value: start }] : []),
     ]);
 
     const from = Math.max(0, bars.length - 160);
