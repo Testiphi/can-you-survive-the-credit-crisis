@@ -8,6 +8,7 @@
  */
 
 import { BEGINNER_RULES, limitBeginnerFill, settleBeginnerRisk } from './beginner.ts';
+import { fingerprint, SAVE_VERSION, validateSave, type GameSave } from './save.ts';
 import type {
   Account,
   Bar,
@@ -132,12 +133,15 @@ export class GameEngine {
   private prevPrices: Map<string, number> = new Map();
   private rumorCooldownUntil: Map<string, number> = new Map();
   private opts: EngineOptions;
+  private actions: PlayerAction[] = [];
+  private datasetHash: string;
 
   /** 真实历史价格源。为 null 时全部标的走合成路径。 */
   private realPrices: RealPriceSource | null = null;
 
   constructor(dataset: Dataset, options: EngineOptions = {}) {
     this.dataset = dataset;
+    this.datasetHash = fingerprint(dataset);
     this.opts = options;
 
     const difficulty = options.config?.difficulty ?? DEFAULT_CONFIG.difficulty;
@@ -279,6 +283,10 @@ export class GameEngine {
   // ------------------------------------------------------------ 玩家操作
 
   submitOrder(order: Order): void {
+    if (this.isOver) throw new Error('本局已结束，不能下单');
+    if (!order || !INSTRUMENT_BY_ID.has(order.instrumentId) || !Number.isSafeInteger(order.quantity) || order.quantity <= 0 ||
+        !['buy', 'sell'].includes(order.side) || order.kind !== 'market') throw new Error('订单无效：仅支持已知标的的正整数市价单');
+    if (this.state.pendingOrders.length >= 1000) throw new Error('待处理订单过多');
     this.state.pendingOrders.push({ ...order, submittedAt: this.state.date });
   }
 
@@ -585,7 +593,7 @@ export class GameEngine {
       const action: PlayerAction = { turnIndex: this.state.turnIndex, date: nextDate, orders: this.state.pendingOrders };
       this.state.news.push(...newNews);
       this.state.pendingOrders = [];
-      void action; // 操作日志在 SaveFile 层维护
+      this.actions.push(structuredClone(action));
     } else {
       this.state.news.push(...newNews);
     }
@@ -1173,14 +1181,42 @@ export class GameEngine {
   // ------------------------------------------------------------ 序列化
 
   /** 存档 = { 种子, 配置, 操作日志 }，见 docs/02 §5。 */
-  save(): { config: GameConfig; seed: number; date: string; turnIndex: number; equity: number } {
+  save(): GameSave {
     return {
-      config: this.config,
+      version: SAVE_VERSION,
+      datasetHash: this.datasetHash,
+      config: { ...this.config },
       seed: this.config.seed,
       date: this.state.date,
       turnIndex: this.state.turnIndex,
       equity: this.state.player.equity,
+      actions: structuredClone(this.actions),
+      pendingOrders: structuredClone(this.state.pendingOrders),
+      stateHash: fingerprint(this.state),
     };
+  }
+
+  /** D0 通过操作日志重建完整引擎，连同内部随机流一起复现；不信任存档净值。 */
+  static restore(dataset: Dataset, input: unknown): GameEngine {
+    validateSave(input);
+    if (input.datasetHash !== fingerprint(dataset)) throw new Error('行情或事件数据已变化，不能按新数据恢复旧存档');
+    const engine = new GameEngine(dataset, { config: input.config });
+    let cursor = 0;
+    for (let turn = 1; turn <= input.turnIndex; turn++) {
+      if (engine.isOver) throw new Error('存档包含结束后的操作');
+      const action = input.actions[cursor];
+      if (action?.turnIndex === turn) {
+        for (const order of action.orders) engine.submitOrder(order);
+        cursor++;
+      }
+      const result = engine.advance();
+      if (action?.turnIndex === turn && action.date !== result.date) throw new Error('操作日志日期不一致');
+    }
+    for (const order of input.pendingOrders) engine.submitOrder(order);
+    if (engine.state.date !== input.date || fingerprint(engine.state) !== input.stateHash) {
+      throw new Error('存档回放校验失败，原存档已保留');
+    }
+    return engine;
   }
 
   /** 面向 UI 的摘要。 */

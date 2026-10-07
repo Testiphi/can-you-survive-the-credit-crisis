@@ -5,6 +5,7 @@
  */
 
 export * from './types.ts';
+export { type GameSave } from './save.ts';
 export { BEGINNER_RULES, beginnerMaintenance } from './beginner.ts';
 export { Rng, createStreams, type Streams, type RngStream } from './rng.ts';
 export {

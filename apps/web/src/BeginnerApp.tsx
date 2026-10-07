@@ -51,9 +51,10 @@ interface Props {
   /** 引擎状态变更后触发父组件重渲染 */
   onChange: () => void;
   onRestart: () => void;
+  storageNote?: string;
 }
 
-export function BeginnerApp({ engine, onChange, onRestart }: Props) {
+export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props) {
   const [selected, setSelected] = useState('SPX');
   const [trades, setTrades] = useState<Fill[]>([]);
   const [stepNote, setStepNote] = useState('');
@@ -166,6 +167,7 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
         </button>
       </div>
 
+      {storageNote && <div className="b-actions-note" role="status">{storageNote}</div>}
       <div className="b-body">
         {/* ---------------- 左：行情与操作 ---------------- */}
         <div className="b-left">

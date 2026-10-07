@@ -71,6 +71,20 @@ export function App() {
   const [skipNote, setSkipNote] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState<string | null>(null);
 
+  const [storageNote, setStorageNote] = useState('');
+  const [hasSave, setHasSave] = useState(() => {
+    try { return localStorage.getItem('cyscc-d0-save') !== null; } catch { return false; }
+  });
+  const persist = useCallback((e: GameEngine) => {
+    if (e.config.difficulty !== 0) return;
+    try {
+      localStorage.setItem('cyscc-d0-save', JSON.stringify(e.save()));
+      setHasSave(true);
+      setStorageNote(`已自动保存至 ${e.state.date}。刷新后可在开始页继续。`);
+    } catch {
+      setStorageNote('自动保存失败：浏览器存储不可用或已满。当前游戏仍可继续，请先不要关闭页面。');
+    }
+  }, []);
   const engineRef = useRef<GameEngine | null>(null);
   const tickRef = useRef(0);
 
@@ -86,9 +100,10 @@ export function App() {
       });
       tickRef.current = 0;
       setSelected('LEH');
+      persist(engineRef.current);
       forceRender((n) => n + 1);
     },
-    [],
+    [persist],
   );
 
   const engine = engineRef.current;
@@ -301,6 +316,23 @@ export function App() {
             开始
           </button>
         </div>
+        {hasSave && (
+          <button className="primary" onClick={() => {
+            try {
+              const raw = localStorage.getItem('cyscc-d0-save');
+              if (!raw) throw new Error('未找到存档');
+              const restored = GameEngine.restore(dataset, JSON.parse(raw));
+              engineRef.current = restored;
+              tickRef.current = restored.state.turnIndex;
+              setStarted(true);
+              setStorageNote(`已恢复至 ${restored.state.date}。`);
+            } catch (error) {
+              setStorageNote(`无法恢复：${error instanceof Error ? error.message : String(error)}。原存档未删除。`);
+            }
+          }}>继续上次 D0 游戏</button>
+        )}
+        {storageNote && <p role="status">{storageNote}</p>}
+        {hasSave && <p>开始新的 D0 游戏会覆盖上次存档；D1 及以上暂不提供自动续玩。</p>}
         {difficulty === 0 && (
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
             <b>D0 是新手模式：只有 2 个标的、4 个按钮。</b>
@@ -338,7 +370,8 @@ export function App() {
     return (
       <BeginnerApp
         engine={engine}
-        onChange={() => forceRender((n) => n + 1)}
+        storageNote={storageNote}
+        onChange={() => { persist(engine); forceRender((n) => n + 1); }}
         onRestart={() => {
           setStarted(false);
           engineRef.current = null;
