@@ -8,6 +8,7 @@ import { BEGINNER_RULES, beginnerPeriod, reviewRun, fundAvailableCash, BANK_RULE
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
 import { buildHints, FILL_REASON } from './glossary.ts';
+import { nextFundingDecision } from '@cyscc/core';
 
 /** D0 只保留两个标的——一个指数、一个单只股票。 */
 const D0_INSTRUMENTS: Array<{ id: string; name: string; hint: string; desc: string }> = [
@@ -81,6 +82,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
   const roleName = insurer ? '保险公司（教学版）' : bank ? '银行资金经理（教学版）' : fund ? '基金经理（教学版）' : '散户';
   const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports, fund ?? bank ?? insurer);
   const lastReport = engine.turnReports.at(-1);
+  const nextDecision = nextFundingDecision(engine.state);
   const inst = D0_INSTRUMENTS.find((i) => i.id === selected) ?? D0_INSTRUMENTS[0];
   const bars = useMemo(
     () => engine.visibleBars(selected),
@@ -186,6 +188,12 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
         <p>{chapter.briefing}</p>
         <p>目标：结束时保留至少 {money(engine.config.initialCapital * chapter.capitalFloor)} {fund ? '净资产与累计兑付之和，并完成全部到期兑付' : bank ? '净资产，并按期清偿全部借款' : insurer ? '净资产，并按期支付全部赔款' : '净资产'}。
         风控挑战：最大回撤不超过 {pct(chapter.drawdownLimit)}，且不触发自动回补。保留现金同样可以完成目标。</p>
+      </div>}
+      {nextDecision && <div className={`banner ${!nextDecision.optional && (nextDecision.shortfall ?? 0) > 0 ? 'danger' : 'info'}`}>
+        <b>最近期限：{nextDecision.date} · 剩余 {nextDecision.days} 个交易日</b>
+        <div>{nextDecision.labels.join('；')}</div>
+        <div>{nextDecision.amount === undefined ? '金额尚未确认，请按赔付范围预留资金。' : `当前估计需自有现金 ${money(nextDecision.amount)}，可用 ${money(nextDecision.availableCash)}，${nextDecision.optional ? '如购买还需准备' : '缺口'} ${money(nextDecision.shortfall ?? 0)}。`}</div>
+        <div>按当前合同与仓位估计，实际金额以结算为准。下单在下一交易日开盘执行，请在期限前安排操作。</div>
       </div>}
       {bank && <div className={`banner ${bank.defaulted ? 'danger' : 'info'}`}>
         <b>银行资产负债表与到期借款</b>

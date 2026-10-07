@@ -9,6 +9,7 @@ export { type GameSave } from './save.ts';
 export { fundAvailableCash } from './fund.ts';
 export { BANK_RULES } from './bank.ts';
 export { INSURANCE_RULES, reinsurancePrice } from './insurance.ts';
+export { nextFundingDecision } from './deadlines.ts';
 export { collateralState, refinanceQuote } from './refinance.ts';
 export { loanLiabilities } from './portfolio.ts';
 export { BEGINNER_CHAPTER, BEGINNER_PERIODS, beginnerPeriod, isBeginnerChapter, reviewRun } from './chapter.ts';
