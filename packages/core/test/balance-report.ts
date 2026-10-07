@@ -75,6 +75,7 @@ const strategies: Strategy[] = ['cash', 'long', 'short', 'short-then-long', 'ran
 const results: Record<string, number[]> = {};
 const eventCount: Record<string, number> = {};
 const failCount: Record<string, number> = {};
+let zeroShareDecisions = 0;
 
 const t0 = performance.now();
 
@@ -85,7 +86,11 @@ for (const strategy of strategies) {
       config: { seed, difficulty: DIFFICULTY, timeline: 'jittered' },
     });
     while (!engine.isOver) {
-      for (const o of decide(strategy, engine, seed)) engine.submitOrder(o);
+      for (const o of decide(strategy, engine, seed)) {
+        // 预算不足一股时观望；其他非法数值仍交给引擎拒绝，不能掩盖策略错误。
+        if (o.quantity === 0) { zeroShareDecisions++; continue; }
+        engine.submitOrder(o);
+      }
       engine.advance();
     }
     results[strategy].push(engine.state.player.equity / engine.config.initialCapital - 1);
@@ -140,5 +145,6 @@ const rates = dataset.events
   .slice(0, 12);
 for (const r of rates) console.log(`  ${r.id.padEnd(34)} ${r.n}/${r.total}`);
 
+console.log(`\n不足一股而观望的决策：${zeroShareDecisions}`);
 console.log(`\n总耗时 ${(ms / 1000).toFixed(1)}s  单局 ${(ms / (RUNS * strategies.length)).toFixed(0)} ms`);
 console.log('='.repeat(78));

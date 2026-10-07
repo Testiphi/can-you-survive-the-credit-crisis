@@ -55,6 +55,9 @@ jobs:
       - name: 价格模型量级检查
         run: node packages/core/test/price-check.ts 8 1
 
+      - name: 平衡报告（冒烟）
+        run: node packages/core/test/balance-report.ts 4 1
+
       - name: 构建前端
         run: pnpm --filter @cyscc/web build
         env:
