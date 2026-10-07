@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { Fill, GameEngine } from '@cyscc/core';
-import { BEGINNER_RULES, BEGINNER_CHAPTER, isBeginnerChapter, reviewRun } from '@cyscc/core';
+import { BEGINNER_RULES, beginnerPeriod, reviewRun } from '@cyscc/core';
 
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
@@ -71,7 +71,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
   const restartTip = useTip('重开\n\n回到开始界面，重新选择种子、难度与时间线。');
 
   const s = engine.summary();
-  const chapter = isBeginnerChapter(engine.config);
+  const chapter = beginnerPeriod(engine.config);
   const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports);
   const lastReport = engine.turnReports.at(-1);
   const inst = D0_INSTRUMENTS.find((i) => i.id === selected) ?? D0_INSTRUMENTS[0];
@@ -174,9 +174,10 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
 
       {storageNote && <div className="b-actions-note" role="status">{storageNote}</div>}
       {chapter && <div className="banner info">
-        <b>{BEGINNER_CHAPTER.title}</b> · {engine.config.startDate} 至 {engine.config.endDate} · 剩余 {engine.isOver ? 0 : engine.remainingTurns} 个交易日
-        <p>目标：结束时保留至少 {money(engine.config.initialCapital * BEGINNER_CHAPTER.capitalFloor)} 净资产。
-        风控挑战：最大回撤不超过 30%，且不触发自动回补。保留现金同样可以完成目标。</p>
+        <b>{chapter.title}</b> · {engine.config.startDate} 至 {engine.config.endDate} · 剩余 {engine.isOver ? 0 : engine.remainingTurns} 个交易日
+        <p>{chapter.briefing}</p>
+        <p>目标：结束时保留至少 {money(engine.config.initialCapital * chapter.capitalFloor)} 净资产。
+        风控挑战：最大回撤不超过 {pct(chapter.drawdownLimit)}，且不触发自动回补。保留现金同样可以完成目标。</p>
       </div>}
       <div className="b-body">
         {/* ---------------- 左：行情与操作 ---------------- */}

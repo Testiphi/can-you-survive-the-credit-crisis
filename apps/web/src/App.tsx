@@ -8,7 +8,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   GameEngine,
-  BEGINNER_CHAPTER,
+  BEGINNER_PERIODS,
   INSTRUMENTS,
   LEVEL_LABEL,
   type Difficulty,
@@ -65,7 +65,7 @@ export function App() {
   const [seed, setSeed] = useState(42);
   const [difficulty, setDifficulty] = useState<Difficulty>(0);
   const [identity, setIdentity] = useState<Identity>('retail');
-  const [shortChapter, setShortChapter] = useState(true);
+  const [periodId, setPeriodId] = useState('crisis');
   const [timeline, setTimeline] = useState<TimelineMode>('jittered');
   const [, forceRender] = useState(0);
   const [selected, setSelected] = useState('LEH');
@@ -92,14 +92,15 @@ export function App() {
 
   const createEngine = useCallback(
     (opts: { seed: number; difficulty: Difficulty; identity: Identity; timeline: TimelineMode }) => {
+      const period = BEGINNER_PERIODS.find(p => p.id === periodId);
       engineRef.current = new GameEngine(dataset, {
         config: {
           seed: opts.seed,
           difficulty: opts.difficulty,
           identity: opts.identity,
           timeline: opts.timeline,
-          ...(opts.difficulty === 0 && shortChapter ? {
-            startDate: BEGINNER_CHAPTER.startDate, endDate: BEGINNER_CHAPTER.endDate,
+          ...(opts.difficulty === 0 && period ? {
+            startDate: period.startDate, endDate: period.endDate,
           } : {}),
         },
       });
@@ -108,7 +109,7 @@ export function App() {
       persist(engineRef.current);
       forceRender((n) => n + 1);
     },
-    [persist, shortChapter],
+    [persist, periodId],
   );
 
   const engine = engineRef.current;
@@ -312,9 +313,9 @@ export function App() {
           </label>
           {difficulty === 0 && (
             <label>
-              <span>游戏长度</span>
-              <select value={shortChapter ? 'chapter' : 'full'} onChange={e => setShortChapter(e.target.value === 'chapter')}>
-                <option value="chapter">短章节：2008 年 9—10 月（推荐）</option>
+              <span>游玩时期</span>
+              <select value={periodId} onChange={e => setPeriodId(e.target.value)}>
+                {BEGINNER_PERIODS.map(p => <option key={p.id} value={p.id}>{p.title}（{p.startDate.slice(0, 7)} 至 {p.endDate.slice(0, 7)}）</option>)}
                 <option value="full">完整复演：2007—2009</option>
               </select>
             </label>

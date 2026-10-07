@@ -29,3 +29,22 @@ test('daily and total statements reconcile, and survive save/replay', () => {
   const restored = GameEngine.restore(data, JSON.parse(JSON.stringify(e.save())));
   assert.deepEqual(restored.turnReports, e.turnReports);
 });
+
+// Each period is selected through dates, so existing saves keep their schema.
+test('all beginner periods use their own objectives and survive a save/replay round trip', async () => {
+  const { BEGINNER_PERIODS, beginnerPeriod } = await import('../src/chapter.ts');
+  for (const period of BEGINNER_PERIODS) {
+    const e = new GameEngine(data, { config: { difficulty: 0, startDate: period.startDate, endDate: period.endDate } });
+    e.submitByNotional('SPX', 25000);
+    for (let i = 0; i < 5; i++) e.advance();
+    const resumed = GameEngine.restore(data, JSON.parse(JSON.stringify(e.save())));
+    while (!e.isOver) assert.deepEqual(resumed.advance(), e.advance());
+    assert.equal(e.state.date, period.endDate);
+    assert.equal(beginnerPeriod(e.config)?.id, period.id);
+    assert.ok(e.state.turnIndex >= 35 && e.state.turnIndex <= 50);
+    const below = reviewRun(e.config, e.config.initialCapital * period.capitalFloor - 1, period.drawdownLimit + 0.01, false, []);
+    assert.equal(below.capitalPreserved, false);
+    assert.equal(below.drawdownControlled, false);
+    assert.ok(e.state.news.some(n => n.source === 'historical'));
+  }
+});
