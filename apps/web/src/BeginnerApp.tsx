@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { Fill, GameEngine } from '@cyscc/core';
-import { BEGINNER_RULES, beginnerPeriod, reviewRun, fundAvailableCash, BANK_RULES, loanLiabilities } from '@cyscc/core';
+import { BEGINNER_RULES, beginnerPeriod, reviewRun, fundAvailableCash, BANK_RULES, loanLiabilities, collateralState, refinanceQuote, nextTradingDay } from '@cyscc/core';
 
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
@@ -74,6 +74,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
   const chapter = beginnerPeriod(engine.config);
   const fund = engine.state.fund;
   const bank = engine.state.bank;
+  const collateral = bank ? collateralState(engine.state.player, engine.state.prices, engine.state.macro.systemicStress) : undefined;
   const obligationsFailed = !!(fund?.defaulted || bank?.defaulted);
   const distributed = engine.state.player.distributedCapital ?? 0;
   const roleName = bank ? '银行资金经理（教学版）' : fund ? '基金经理（教学版）' : '散户';
@@ -190,9 +191,30 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
         <p>开局自有资本 {money(engine.config.initialCapital)}，借入等额资金，继承约 1.5 倍资本的证券组合，其余为现金。
         当前负债合计 {money(loanLiabilities(engine.state.player))}，可偿债现金 {money(fundAvailableCash(engine.state.player, engine.state.prices))}。</p>
         {(engine.state.player.loans ?? []).map(loan => <div key={loan.id}>
-          {loan.id.replace('loan-', '借款 ')} · {loan.dueDate} 收盘到期 · 本金 {money(loan.principal)} · 已计提利息 {exactMoney(loan.accruedInterest)} · {loan.status === 'repaid' ? '已偿还' : loan.status === 'defaulted' ? '违约' : '未到期'}
+          {loan.id.replace('loan-', '借款 ')} · {loan.dueDate} 收盘到期 · 本金 {money(loan.principal)} · 已计提利息 {exactMoney(loan.accruedInterest)} · {loan.status === 'repaid' ? '已偿还' : loan.status === 'defaulted' ? '违约' : '未到期'} · 年化 {pct(loan.annualRate)}{loan.refinancing ? ` · 已办理${loan.refinancing === 'secured' ? '抵押' : '无抵押'}展期` : ''}
+          {loan.status === 'active' && !loan.refinancing && <details>
+            <summary>查看这笔借款的展期方案</summary>
+            {(['secured', 'term'] as const).map(plan => {
+              const quote = refinanceQuote(engine.state.player, engine.state.prices, engine.state.macro.systemicStress, nextTradingDay(engine.state.date), engine.config.endDate, loan, plan);
+              return <div key={plan} style={{ margin: '10px 0' }}>
+                <b>{plan === 'secured' ? '抵押展期（10 个交易日）' : '无抵押展期（20 个交易日）'}</b>
+                <div>预计新到期日 {quote.dueDate} · 年化 {pct(quote.annualRate)} · 手续费 {money(quote.fee)}</div>
+                <div>预计需要现金 {money(quote.cashRequired)}（包括利息、手续费、补还本金 {money(quote.principalRepaid)}）</div>
+                {plan === 'secured' && <div>当前抵押折扣 {pct(quote.haircut)}；以后资产下跌或折扣提高，可能要求补还本金。</div>}
+                {quote.reason && <div>{quote.reason}</div>}
+                <button disabled={engine.isOver || !!quote.reason} onClick={() => { engine.requestBankRefinance({ loanId: loan.id, plan }); advanceSession([], 1); }}>
+                  {plan === 'secured' ? '申请抵押展期' : '申请无抵押展期'}
+                </button>
+              </div>;
+            })}
+            <p>以上为当前行情下的估计，不含下一日新增利息；点击后推进一天，按次日收盘行情重新审核。被拒绝时原合同继续有效。</p>
+          </details>}
         </div>)}
-        <p>按未还本金年化 {pct(BANK_RULES.annualRate)}、每交易日 1/252 计息。到期日前会提醒；到期日按本息足额偿还，不自动展期。卖空担保资金不可还债；现金不足即结束本局。</p>
+        {collateral && collateral.used > 0 && <p>
+          共享抵押池：折扣 {pct(collateral.haircut)} · 认可额度 {money(collateral.capacity)} · 已占用本金 {money(collateral.used)} · 缺口 {money(collateral.shortfall)}。
+          {bank.collateralCallDue ? `处理期限：${bank.collateralCallDue} 收盘。` : '出现缺口时先用可用现金补还；不足时给一交易日处理。'}
+        </p>}
+        <p>初始借款按未还本金年化 {pct(BANK_RULES.annualRate)}、每交易日 1/252 计息。到期前五个交易日起可申请展期，每笔仅一次，新期限不会超过本局结束日。到期按本息足额偿还，不自动展期。卖空担保资金不可还债；现金不足即结束本局。</p>
         <button disabled={engine.isOver || !(engine.state.player.loans ?? []).some(l => l.status === 'active')} onClick={() => {
           engine.requestBankRepayment(); advanceSession([], 1);
         }}>提前偿债（用可用现金，推进一天）</button>
@@ -262,7 +284,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           {engine.isOver && !s.bankrupt && !obligationsFailed && (
             <div className="banner info">本局已到达 {engine.config.endDate}。查看右侧复盘了解资金变化。</div>
           )}
-          {bank?.defaulted && <div className="banner danger">未能按时清偿到期借款，本局结束。未偿本金和利息仍计入负债。</div>}
+          {bank?.defaulted && <div className="banner danger">未能按时履行融资义务，本局结束。未偿本金和利息仍计入负债。</div>}
           {fund?.defaulted && <div className="banner danger">未能按时兑付投资者赎回，本局结束。未支付金额没有从账户扣除。</div>}
           {s.bankrupt && (
             <div className="banner danger">
@@ -312,6 +334,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
             <div className="line">做空持有费：−{exactMoney(lastReport.borrowFees)}</div>
             {lastReport.capitalOutflow !== undefined && <div className="line">投资者赎回（资本返还）：−{exactMoney(lastReport.capitalOutflow)}</div>}
             {lastReport.loanInterest !== undefined && <>
+              <div className="line">展期手续费：−{exactMoney(lastReport.financingFees ?? 0)}</div>
               <div className="line">当日借款利息成本：−{exactMoney(lastReport.loanInterest)}</div>
               <div className="line">偿债现金流：本金 {exactMoney(lastReport.principalRepaid ?? 0)}，已计提利息 {exactMoney(lastReport.interestPaid ?? 0)}（不重复扣减净资产）</div>
             </>}
@@ -319,14 +342,14 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           </div>}
           {engine.isOver && <div className="b-panel">
             <h3>本局复盘</h3>
-            <p>{s.bankrupt ? '账户已破产。' : bank?.defaulted ? '到期借款未能偿还。' : fund?.defaulted ? '投资者赎回未能按期兑付。' : '已完成本局。'} 净收益 {signed(s.equity + distributed - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
+            <p>{s.bankrupt ? '账户已破产。' : bank?.defaulted ? '融资义务未能按期履行。' : fund?.defaulted ? '投资者赎回未能按期兑付。' : '已完成本局。'} 净收益 {signed(s.equity + distributed - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
             {chapter && <p>本金目标：{review.capitalPreserved && review.survived ? '完成' : '未完成'}；
               回撤挑战：{review.drawdownControlled ? '完成' : '未完成'}；
               避免自动回补：{review.noForcedClose ? '完成' : '未完成'}。</p>}
-            <p>累计手续费 {money(review.commissions)}，做空持有费 {money(review.borrowFees)}{bank ? `，借款利息 ${money(review.loanInterest)}` : ''}，自动回补 {review.riskCloses} 次。</p>
+            <p>累计手续费 {money(review.commissions)}，做空持有费 {money(review.borrowFees)}{bank ? `，借款利息 ${money(review.loanInterest)}，展期手续费 ${money(review.financingFees)}` : ''}，自动回补 {review.riskCloses} 次。</p>
             {review.worstDay && review.worstDay.equityAfter + (review.worstDay.capitalOutflow ?? 0) < review.worstDay.equityBefore && <p>
               最大单日净损失发生在 {review.worstDay.date}：{money(review.worstDay.equityBefore - review.worstDay.equityAfter - (review.worstDay.capitalOutflow ?? 0))}。
-              当日持仓与交易价差 {signed(review.worstDay.marketPnl)}，费用合计 {money(review.worstDay.commission + review.worstDay.borrowFees + (review.worstDay.loanInterest ?? 0))}。
+              当日持仓与交易价差 {signed(review.worstDay.marketPnl)}，费用合计 {money(review.worstDay.commission + review.worstDay.borrowFees + (review.worstDay.loanInterest ?? 0) + (review.worstDay.financingFees ?? 0))}。
               {review.worstDay.fills.some(f => f.reason === 'risk_close') ? '当日触及空头风险底线并自动回补。' : ''}
             </p>}
             <p>复盘只依据本局实际成交与每日净值，未把同时出现的新闻认定为损失的唯一原因。</p>

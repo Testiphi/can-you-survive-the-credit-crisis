@@ -34,6 +34,7 @@ export function reviewRun(config: GameConfig, equity: number, drawdown: number, 
   const commissions = reports.reduce((sum, r) => sum + r.commission, 0);
   const borrowFees = reports.reduce((sum, r) => sum + r.borrowFees, 0);
   const loanInterest = reports.reduce((sum, r) => sum + (r.loanInterest ?? 0), 0);
+  const financingFees = reports.reduce((sum, r) => sum + (r.financingFees ?? 0), 0);
   const riskCloses = reports.filter(r => r.fills.some(f => f.reason === 'risk_close')).length;
   const worstDay = reports.reduce<TurnReport | undefined>((worst, r) =>
     !worst || r.equityAfter - r.equityBefore + (r.capitalOutflow ?? 0) < worst.equityAfter - worst.equityBefore + (worst.capitalOutflow ?? 0) ? r : worst, undefined);
@@ -42,6 +43,6 @@ export function reviewRun(config: GameConfig, equity: number, drawdown: number, 
     capitalPreserved: equity + distributedCapital + 1e-6 >= config.initialCapital * period.capitalFloor,
     drawdownControlled: drawdown <= period.drawdownLimit + 1e-10,
     noForcedClose: riskCloses === 0,
-    commissions, borrowFees, loanInterest, riskCloses, worstDay, distributedCapital,
+    commissions, borrowFees, loanInterest, financingFees, riskCloses, worstDay, distributedCapital,
   };
 }

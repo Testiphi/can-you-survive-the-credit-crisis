@@ -345,6 +345,7 @@ export interface NPCAgent {
 // ---------------------------------------------------------------- 状态与结果
 
 export interface PlayerAction {
+  refinance?: RefinanceRequest;
   repayLoans?: boolean;
   turnIndex: number;
   date: DateStr;
@@ -358,7 +359,8 @@ export interface ScoreSnapshot {
 }
 
 export interface GameState {
-  bank?: { defaulted: boolean };
+  bank?: BankState;
+  bankRefinancePending?: RefinanceRequest;
   bankRepaymentPending?: boolean;
   fund?: FundState;
   config: GameConfig;
@@ -393,6 +395,7 @@ export interface TurnResult {
 }
 
 export interface TurnReport {
+  financingFees?: Money;
   loanInterest?: Money;
   principalRepaid?: Money;
   interestPaid?: Money;
@@ -414,12 +417,23 @@ export interface FundState {
 }
 
 export interface Loan {
+  refinancing?: 'secured' | 'term';
   id: string;
   principal: Money;
   accruedInterest: Money;
   annualRate: number;
   dueDate: DateStr;
   status: 'active' | 'repaid' | 'defaulted';
+}
+
+export interface BankState {
+  defaulted: boolean;
+  collateralCallDue?: DateStr;
+}
+
+export interface RefinanceRequest {
+  loanId: string;
+  plan: 'secured' | 'term';
 }
 
 // ---------------------------------------------------------------- 真实历史数据

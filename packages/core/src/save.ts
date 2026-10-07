@@ -1,7 +1,8 @@
-import type { GameConfig, Order, PlayerAction } from './types.ts';
+import type { GameConfig, Order, PlayerAction, RefinanceRequest } from './types.ts';
 
 export const SAVE_VERSION = 1;
 export interface GameSave {
+  bankRefinancePending?: RefinanceRequest;
   bankRepaymentPending?: boolean;
   version: number;
   datasetHash: string;
@@ -40,12 +41,18 @@ export function validateSave(value: unknown): asserts value is GameSave {
         date < '2007-01-01' || date > '2009-12-31') throw new Error('存档日期不受支持');
   }
   if (s.config.endDate < s.config.startDate) throw new Error('存档日期顺序无效');
+  const checkRefinance = (request: RefinanceRequest | undefined, repay?: boolean) => {
+    if (request === undefined) return;
+    if (!request || s.config.identity !== 'bank' || repay || typeof request.loanId !== 'string' || !['secured', 'term'].includes(request.plan)) throw new Error('存档展期指令无效');
+  };
+  checkRefinance(s.bankRefinancePending, s.bankRepaymentPending);
   if (s.bankRepaymentPending !== undefined && (typeof s.bankRepaymentPending !== 'boolean' || s.config.identity !== 'bank')) throw new Error('存档偿债指令无效');
   let previous = 0;
   for (const action of s.actions) {
     if (!action || !Number.isInteger(action.turnIndex) || action.turnIndex <= previous || action.turnIndex > s.turnIndex ||
         !Array.isArray(action.orders) || action.orders.length > 1000) throw new Error('操作日志无效');
     previous = action.turnIndex;
+    checkRefinance(action.refinance, action.repayLoans);
     if (action.repayLoans !== undefined && (typeof action.repayLoans !== 'boolean' || s.config.identity !== 'bank')) throw new Error('操作日志偿债指令无效');
   }
 }
