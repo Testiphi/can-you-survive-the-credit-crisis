@@ -8,7 +8,7 @@
  * 因此构建不需要网络。文件缺失时引擎会自动退回合成路径。
  */
 
-import type { Dataset, EventCard, InstitutionsFile, MarketData } from '@cyscc/core';
+import type { Dataset, EventCard, InstitutionsFile, MarketData, MarketPatch } from '@cyscc/core';
 import type { RumorsFile } from '@cyscc/core';
 
 import events2007 from '../../../data/events/events-2007.json';
@@ -18,8 +18,10 @@ import eventsRepo from '../../../data/events/events-repo.json';
 import institutions from '../../../data/events/institutions.json';
 import rumors from '../../../data/events/rumors.json';
 import market from '../../../data/processed/market.json';
+import marketPatch from '../../../data/processed/early-ohlc.json';
 
 export const dataset: Dataset = {
+  marketPatch: marketPatch as unknown as MarketPatch,
   events: [
     ...(events2007 as unknown as { events: EventCard[] }).events,
     ...(events2008 as unknown as { events: EventCard[] }).events,

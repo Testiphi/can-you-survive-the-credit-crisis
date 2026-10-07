@@ -29,6 +29,8 @@ export function validateSave(value: unknown): asserts value is GameSave {
   if (!value || typeof value !== 'object') throw new Error('存档格式无效');
   const s = value as GameSave;
   if (s.version !== SAVE_VERSION) throw new Error('存档版本不兼容，请保留原存档');
+  if (s.config?.demoVersion !== undefined && s.config.demoVersion !== 1) throw new Error('不支持的演示版规则版本');
+  if (s.config?.marketRevision !== undefined && s.config.marketRevision !== 1) throw new Error('不支持的行情修订版本');
   if (!s.config || s.config.difficulty !== 0 || !['retail', 'hedge_fund', 'bank', 'insurer'].includes(s.config.identity) || s.config.timeline !== 'historical') {
     throw new Error('目前只支持恢复 D0 历史模式存档');
   }

@@ -68,6 +68,7 @@ export function loadDataset(dir = eventsDir()): Dataset {
     throw new Error(`事件目录不存在: ${dir}`);
   }
   return {
+    ...(existsSync(join(processedDir(), 'early-ohlc.json')) ? { marketPatch: readJson<import('./types.ts').MarketPatch>(join(processedDir(), 'early-ohlc.json')) } : {}),
     events: loadEvents(dir),
     institutions: loadInstitutions(dir),
     rumors: loadRumors(dir),

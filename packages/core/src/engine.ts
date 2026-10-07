@@ -12,6 +12,8 @@ import { fingerprint, SAVE_VERSION, validateSave, type GameSave } from './save.t
 import { createFund, settleFund } from './fund.ts';
 import { BANK_RULES, initializeBank, settleBank } from './bank.ts';
 import { createInsurer, settleInsurance } from './insurance.ts';
+import { demoEvents } from './demo.ts';
+import { applyMarketRevision, isEstimatedMarketBar } from './market-revision.ts';
 import type {
   Account,
   Bar,
@@ -25,6 +27,7 @@ import type {
   InstitutionsFile,
   MacroState,
   MarketData,
+  MarketPatch,
   NewsItem,
   Order,
   PlayerAction,
@@ -74,6 +77,7 @@ import { makeContext } from './conditions.ts';
 import { RealPriceSource, REAL_PATH_SHOCK_SCALE } from './market-data.ts';
 
 export interface Dataset {
+  marketPatch?: MarketPatch;
   events: EventCard[];
   institutions: InstitutionsFile;
   rumors: RumorsFile;
@@ -146,6 +150,16 @@ export class GameEngine {
   private realPrices: RealPriceSource | null = null;
 
   constructor(dataset: Dataset, options: EngineOptions = {}) {
+    const { marketPatch, ...legacyDataset } = dataset;
+    dataset = legacyDataset;
+    if (options.config?.marketRevision !== undefined) {
+      if (options.config.marketRevision !== 1) throw new Error('不支持的行情修订版本');
+      dataset = { ...dataset, market: applyMarketRevision(dataset.market, marketPatch) };
+    }
+    if (options.config?.demoVersion !== undefined) {
+      if (options.config.difficulty !== 0) throw new Error('演示版规则仅适用于 D0');
+      dataset = { ...dataset, events: demoEvents(dataset.events, options.config.demoVersion) };
+    }
     this.dataset = dataset;
     this.datasetHash = fingerprint(dataset);
     this.opts = options;
@@ -216,7 +230,7 @@ export class GameEngine {
     const bars = new Map<string, Bar[]>();
     const prices = new Map<string, number>();
     for (const inst of INSTRUMENTS) {
-      const realFirst = difficulty === 0
+      const realFirst = difficulty === 0 || this.config.marketRevision === 1
         ? this.realPrices?.barOnOrBefore(inst.id, this.config.startDate)
         : this.realPrices?.firstBar(inst.id);
       const startPrice = realFirst ? realFirst.close : inst.startPrice;
@@ -226,10 +240,12 @@ export class GameEngine {
       bars.set(inst.id, [
         {
           date: this.config.startDate,
-          provenance: difficulty === 0 ? (realFirst ? 'estimated' : 'synthetic') : undefined,
-          open: startPrice,
-          high: startPrice,
-          low: startPrice,
+          provenance: this.config.marketRevision === 1
+            ? realFirst?.date === this.config.startDate && !isEstimatedMarketBar(realFirst) ? 'historical' : realFirst ? 'estimated' : 'synthetic'
+            : difficulty === 0 ? (realFirst ? 'estimated' : 'synthetic') : realFirst && isEstimatedMarketBar(realFirst) ? 'estimated' : undefined,
+          open: this.config.marketRevision === 1 && realFirst?.date === this.config.startDate ? realFirst.open : startPrice,
+          high: this.config.marketRevision === 1 && realFirst?.date === this.config.startDate ? realFirst.high : startPrice,
+          low: this.config.marketRevision === 1 && realFirst?.date === this.config.startDate ? realFirst.low : startPrice,
           close: startPrice,
           volume: realFirst?.volume || Math.round(inst.baseAdv / Math.max(0.5, startPrice)),
           adv20: inst.baseAdv,
@@ -261,6 +277,21 @@ export class GameEngine {
       pendingOrders: [],
       haltTrading: false,
     };
+    if (this.config.demoVersion === 1) {
+      const past = this.scenario.cards.filter(card => card.date <= this.state.date &&
+        (card.trigger.type !== 'scheduled' || !card.trigger.modeOnly || card.trigger.modeOnly === 'historical'));
+      this.state.firedEvents = past.map(card => card.id);
+      for (const card of past) {
+        for (const id of card.terminalFailure ?? []) {
+          if (this.state.institutions[id]) markFailed(this.state.institutions, id, card.date, card.id);
+        }
+      }
+      // 当日收盘已包含过去事件的价格结果，不再叠加过去冲击。
+      this.state.news = past.filter(card => card.newsVisibility === 0).slice(-3).map(card => ({
+        id: `opening-${card.id}`, date: card.date, headline: card.headline,
+        body: `开局已知背景。${card.narrative}`, source: 'historical', credibility: 1, isTrue: true, eventId: card.id,
+      }));
+    }
   }
 
   // ------------------------------------------------------------ 只读视图
@@ -376,6 +407,7 @@ export class GameEngine {
     const decisions: FireDecision[] = this.config.difficulty === 0
       ? this.scenario.cards.filter(card => {
           const modeOnly = card.trigger.type === 'scheduled' ? card.trigger.modeOnly : undefined;
+          if (this.config.demoVersion === 1 && this.state.firedEvents.includes(card.id)) return false;
           return (!modeOnly || modeOnly === 'historical') && card.date <= nextDate &&
             (card.date > previousDate || (this.state.turnIndex === 1 && card.date === previousDate));
         }).map(card => ({ card, forced: false }))
@@ -489,6 +521,7 @@ export class GameEngine {
 
         const bar: Bar = {
           date: nextDate,
+          provenance: isEstimatedMarketBar(realBar) ? 'estimated' : 'historical',
           open: round2(Math.max(0.01, realBar.open * mult)),
           high: round2(Math.max(0.01, realBar.high * mult)),
           low: round2(Math.max(0.01, realBar.low * mult)),
@@ -1263,8 +1296,8 @@ export class GameEngine {
   /** D0 通过操作日志重建完整引擎，连同内部随机流一起复现；不信任存档净值。 */
   static restore(dataset: Dataset, input: unknown): GameEngine {
     validateSave(input);
-    if (input.datasetHash !== fingerprint(dataset)) throw new Error('行情或事件数据已变化，不能按新数据恢复旧存档');
     const engine = new GameEngine(dataset, { config: input.config });
+    if (input.datasetHash !== engine.datasetHash) throw new Error('行情或事件数据已变化，不能按新数据恢复旧存档');
     let cursor = 0;
     for (let turn = 1; turn <= input.turnIndex; turn++) {
       if (engine.isOver) throw new Error('存档包含结束后的操作');

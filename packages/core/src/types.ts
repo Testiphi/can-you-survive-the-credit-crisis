@@ -18,6 +18,9 @@ export type Identity = 'retail' | 'hedge_fund' | 'bank' | 'insurer';
 export type TimelineMode = 'historical' | 'jittered' | 'parallel';
 
 export interface GameConfig {
+  /** 省略表示原版回放；新演示版显式固定规则与事件修订版本。 */
+  demoVersion?: 1;
+  marketRevision?: 1;
   seed: number;
   difficulty: Difficulty;
   identity: Identity;
@@ -487,4 +490,12 @@ export interface MarketData {
   gapFillNote?: string;
   series: Record<string, MarketBar[]>;
   synthetic: Record<string, string>;
+}
+
+export interface MarketPatch {
+  version: 1;
+  source: string;
+  sourceNote: string;
+  range: [DateStr, DateStr];
+  series: Record<string, MarketBar[]>;
 }

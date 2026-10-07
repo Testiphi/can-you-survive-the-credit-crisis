@@ -17,6 +17,7 @@ data/raw/
 # 其余 processed 文件仍是中间产物，不入库。
 data/processed/*.json
 !data/processed/market.json
+!data/processed/early-ohlc.json
 !data/processed/.gitkeep
 
 # python

@@ -50,7 +50,7 @@ test('insurance commands and accounting replay across claims and payments in eve
   }
 });
 
-test('cash strategies show a genuine coverage tradeoff across the three historical periods',()=>{
+test('cash strategies show a genuine coverage tradeoff across the five historical periods',()=>{
   let coverBetter=false,selfBetter=false;
   for(const p of BEGINNER_PERIODS){
     const ends=[false,true].map(covered=>{

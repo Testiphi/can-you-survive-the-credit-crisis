@@ -13,7 +13,7 @@ export { nextFundingDecision } from './deadlines.ts';
 export { previewBeginnerTrade, type TradePreview } from './trade-preview.ts';
 export { collateralState, refinanceQuote } from './refinance.ts';
 export { loanLiabilities } from './portfolio.ts';
-export { BEGINNER_CHAPTER, BEGINNER_PERIODS, beginnerPeriod, isBeginnerChapter, reviewRun } from './chapter.ts';
+export { BEGINNER_CHAPTER, BEGINNER_PERIODS, DEMO_CHAPTERS, beginnerPeriod, isBeginnerChapter, reviewRun } from './chapter.ts';
 export { BEGINNER_RULES, beginnerMaintenance } from './beginner.ts';
 export { Rng, createStreams, type Streams, type RngStream } from './rng.ts';
 export {

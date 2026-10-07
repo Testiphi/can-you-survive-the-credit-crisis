@@ -25,6 +25,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: { manualChunks: { charts: ['lightweight-charts'], react: ['react', 'react-dom'] } },
+    },
     // 事件卡 JSON 会被打进 bundle；提高警告阈值避免噪音
     chunkSizeWarningLimit: 900,
   },

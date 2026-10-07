@@ -27,6 +27,9 @@ jobs:
       - name: 事件卡数据集校验
         run: python tools/validate_events.py
 
+      - name: 行情管道回归检查
+        run: python -m unittest discover -s tools -p 'test_*.py'
+
       - name: 检查事件目录文档与数据是否同步
         run: python tools/gen_timeline.py --check
 

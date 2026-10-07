@@ -17,7 +17,15 @@ export const BEGINNER_PERIODS = [
   { id: 'policy', title: '政策转折：重新评估方向', startDate: '2009-03-02', endDate: '2009-04-30',
     capitalFloor: 0.8, drawdownLimit: 0.25,
     briefing: '政策与机构经营消息不断变化。练习重新审视多空方向，避免把过去走势当作承诺。' },
+  { id: 'bear', title: '贝尔斯登：资产与现金', startDate: '2008-02-01', endDate: '2008-03-31',
+    capitalFloor: 0.8, drawdownLimit: 0.25,
+    briefing: '此前央行已推出流动性工具，融资压力仍在延续。练习区分账面价值与真正能支付的现金，准备应对到期义务。' },
+  { id: 'repair', title: '修复期：退出紧急状态', startDate: '2009-05-01', endDate: '2009-06-30',
+    capitalFloor: 0.8, drawdownLimit: 0.25,
+    briefing: '此前已推出资产购买、财政与金融稳定措施。市场在等待银行压力测试和资本补充进展；练习有节制地恢复风险敞口，同时完成既有义务。' },
 ] as const;
+
+export const DEMO_CHAPTERS = [...BEGINNER_PERIODS].sort((a, b) => a.startDate.localeCompare(b.startDate));
 
 export function beginnerPeriod(config: GameConfig) {
   return config.difficulty === 0 ? BEGINNER_PERIODS.find(p => p.startDate === config.startDate && p.endDate === config.endDate) : undefined;

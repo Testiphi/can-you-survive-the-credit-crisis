@@ -1,7 +1,9 @@
 /** Read-only audit of candidate chapter data, not a verification of source prices/history. */
+import { demoEvents } from '../packages/core/src/demo.ts';
 import { loadDataset } from '../packages/core/src/load-node.ts';
 import { tradingDaysBetween } from '../packages/core/src/time.ts';
-const data=loadDataset();
+const raw=loadDataset();
+const data={...raw,events:demoEvents(raw.events,1)};
 const candidates=[['2008-02-01','2008-03-31'],['2009-05-01','2009-06-30'],['2010-04-01','2010-06-30']];
 for(const [start,end] of candidates){
   const calendarSupported=start>='2007-01-01' && end<='2009-12-31';

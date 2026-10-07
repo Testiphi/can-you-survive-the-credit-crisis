@@ -149,7 +149,7 @@ def align_to_calendar(
     回填方法：缺失日的收益 = beta × 当日标普收益，逐日推进。
     - 序列中间/尾部的缺口：从上一个已知收盘向前推
     - 序列开头的缺口：从第一个已知收盘向后倒推（用倒数）
-    - open/high/low 按同比例缩放，volume 记 0（引擎不会用到）
+    - 缺失日只估算收盘，不伪造影线；OHLC 暂置为收盘，volume 记 0，filled=True。图表应显示估算线。
     """
     by_date = {r["date"]: r for r in rows}
     known_dates = sorted(by_date)
@@ -194,7 +194,7 @@ def align_to_calendar(
                 break
         if nxt is None:
             continue
-        ret = spx_close.get(d, 0) / spx_close.get(nxt, 1) - 1 if spx_close.get(nxt) else 0
+        ret = spx_close.get(nxt, 0) / spx_close.get(d, 1) - 1 if spx_close.get(d) else 0
         close = out[nxt]["close"] / (1 + beta * ret) if (1 + beta * ret) > 0.01 else out[nxt]["close"]
         out[d] = {
             "date": d,

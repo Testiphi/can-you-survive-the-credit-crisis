@@ -9,6 +9,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   GameEngine,
   BEGINNER_PERIODS,
+  DEMO_CHAPTERS,
+  type GameSave,
   INSTRUMENTS,
   LEVEL_LABEL,
   type Difficulty,
@@ -22,6 +24,7 @@ import { Tip, useTip } from './Tip.tsx';
 import { BUTTON_TIPS, FILL_REASON, GLOSSARY, buildHints } from './glossary.ts';
 import { QuotePanel, computeQuote } from './QuotePanel.tsx';
 import { BeginnerApp } from './BeginnerApp.tsx';
+import { readDemoProgress, recordDemoProgress } from './demo-progress.ts';
 
 const TRADABLE = INSTRUMENTS.filter((i) => i.sector !== 'index');
 const TABS = ['SPX', ...TRADABLE.map((i) => i.id)];
@@ -37,9 +40,9 @@ const MAX_EVENT_HUNT_DAYS = 120;
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   0: 'D0 · 新手模式（推荐第一次玩）',
-  1: 'D1 · 标准（宏观指标 + 完整标的）',
-  2: 'D2 · 进阶（加上融资与监管）',
-  3: 'D3 · 硬核（噪声、监管、冲击全开）',
+  1: 'D1 · 实验模式（宏观指标 + 完整标的）',
+  2: 'D2 · 实验模式（融资与监管）',
+  3: 'D3 · 实验模式（完整复杂规则）',
 };
 
 const IDENTITY_LABEL: Record<Identity, string> = {
@@ -65,7 +68,9 @@ export function App() {
   const [seed, setSeed] = useState(42);
   const [difficulty, setDifficulty] = useState<Difficulty>(0);
   const [identity, setIdentity] = useState<Identity>('retail');
-  const [periodId, setPeriodId] = useState('crisis');
+  const [periodId, setPeriodId] = useState('warning');
+  const [runId, setRunId] = useState(0);
+  const [demoProgress, setDemoProgress] = useState(readDemoProgress);
   const [timeline, setTimeline] = useState<TimelineMode>('jittered');
   const [, forceRender] = useState(0);
   const [selected, setSelected] = useState('LEH');
@@ -83,6 +88,8 @@ export function App() {
       localStorage.setItem('cyscc-d0-save', JSON.stringify(e.save()));
       setHasSave(true);
       setStorageNote(`已自动保存至 ${e.state.date}。刷新后可在开始页继续。`);
+      try { setDemoProgress(recordDemoProgress(e)); }
+      catch { setStorageNote('本局已保存，但章节进度记录失败。'); }
     } catch {
       setStorageNote('自动保存失败：浏览器存储不可用或已满。当前游戏仍可继续，请先不要关闭页面。');
     }
@@ -91,20 +98,23 @@ export function App() {
   const tickRef = useRef(0);
 
   const createEngine = useCallback(
-    (opts: { seed: number; difficulty: Difficulty; identity: Identity; timeline: TimelineMode }) => {
-      const period = BEGINNER_PERIODS.find(p => p.id === periodId);
+    (opts: { seed: number; difficulty: Difficulty; identity: Identity; timeline: TimelineMode }, chapterId = periodId) => {
+      const period = BEGINNER_PERIODS.find(p => p.id === chapterId);
       engineRef.current = new GameEngine(dataset, {
         config: {
           seed: opts.seed,
           difficulty: opts.difficulty,
           identity: opts.identity,
           timeline: opts.timeline,
+          marketRevision: 1,
+          ...(opts.difficulty === 0 ? { demoVersion: 1 as const } : {}),
           ...(opts.difficulty === 0 && period ? {
             startDate: period.startDate, endDate: period.endDate,
-          } : {}),
+          } : { startDate: '2007-01-03', endDate: '2009-12-31' }),
         },
       });
       tickRef.current = 0;
+      setRunId(n => n + 1);
       setSelected('LEH');
       persist(engineRef.current);
       forceRender((n) => n + 1);
@@ -113,6 +123,27 @@ export function App() {
   );
 
   const engine = engineRef.current;
+
+  const resumeSave = (save: unknown) => {
+    const restored = GameEngine.restore(dataset, save);
+    engineRef.current = restored;
+    tickRef.current = restored.state.turnIndex;
+    setRunId(n => n + 1);
+    setStarted(true);
+    setIdentity(restored.config.identity); setDifficulty(restored.config.difficulty);
+    setSeed(restored.config.seed); setTimeline(restored.config.timeline);
+    setPeriodId(DEMO_CHAPTERS.find(p => p.startDate === restored.config.startDate && p.endDate === restored.config.endDate)?.id ?? 'full');
+    persist(restored);
+  };
+
+  const exportSave = () => {
+    const current = engineRef.current;
+    if (!current) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(current.save(), null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `credit-crisis-${current.config.identity}-${current.state.date}.json`;
+    link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const proceed = useCallback(
     (steps: number, stopOnEvent: boolean) => {
@@ -315,7 +346,7 @@ export function App() {
             <label>
               <span>游玩时期</span>
               <select value={periodId} onChange={e => setPeriodId(e.target.value)}>
-                {BEGINNER_PERIODS.map(p => <option key={p.id} value={p.id}>{p.title}（{p.startDate.slice(0, 7)} 至 {p.endDate.slice(0, 7)}）</option>)}
+                {DEMO_CHAPTERS.map(p => <option key={p.id} value={p.id}>{p.title}（{p.startDate.slice(0, 7)} 至 {p.endDate.slice(0, 7)}）</option>)}
                 <option value="full">完整复演：2007—2009</option>
               </select>
             </label>
@@ -336,20 +367,31 @@ export function App() {
             try {
               const raw = localStorage.getItem('cyscc-d0-save');
               if (!raw) throw new Error('未找到存档');
-              const restored = GameEngine.restore(dataset, JSON.parse(raw));
-              engineRef.current = restored;
-              tickRef.current = restored.state.turnIndex;
-              setStarted(true);
-              setStorageNote(`已恢复至 ${restored.state.date}。`);
+              resumeSave(JSON.parse(raw));
             } catch (error) {
               setStorageNote(`无法恢复：${error instanceof Error ? error.message : String(error)}。原存档未删除。`);
             }
           }}>继续上次 D0 游戏</button>
         )}
         {storageNote && <p role="status">{storageNote}</p>}
+        <label><span>导入本地存档</span><input type="file" accept=".json,application/json" onChange={async event => {
+          const file = event.target.files?.[0]; event.target.value = '';
+          if (!file) return;
+          try {
+            if (file.size > 5 * 1024 * 1024) throw new Error('存档超过 5 MiB');
+            resumeSave(JSON.parse(await file.text()) as GameSave);
+          } catch (error) { setStorageNote(`导入失败：${error instanceof Error ? error.message : String(error)}。原存档未覆盖。`); }
+        }} /></label>
         {hasSave && <p>开始新的 D0 游戏会覆盖上次存档；D1 及以上暂不提供自动续玩。</p>}
         {difficulty === 0 && (
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
+            <h3>演示版章节路线 · {DEMO_CHAPTERS.length} 章 × 4 种角色</h3>
+            <p>建议先用散户完成第一章，再尝试资金义务更复杂的角色。每章独立重置账户；完整三年复演可在时期列表中选择。</p>
+            <ol>{DEMO_CHAPTERS.map(p => <li key={p.id}>
+              <button className="ghost" onClick={() => setPeriodId(p.id)}>{p.title}</button>
+              {' · '}{demoProgress[`${p.id}:${identity}`]?.passed ? '当前角色已达标' : demoProgress[`${p.id}:${identity}`] ? '当前角色已尝试' : '待挑战'}
+            </li>)}</ol>
+            <p>{DEMO_CHAPTERS.find(p => p.id === periodId)?.briefing}</p>
             <b>D0 是新手模式：保留 2 个标的、4 个基础交易按钮，并提供角色专属操作。</b>
             {'\n\n'}
             使用历史时间线，事件日期不随种子漂移。散户练习买入、做空和管理持仓；基金经理还须按时兑付投资者赎回；银行资金经理接手证券资产和两笔真实记账的到期借款；保险公司要准备赔付，并决定是否提前购买再保险。不启用 NPC、真假传闻、回购融资或监管处罚。
@@ -364,7 +406,7 @@ export function App() {
         )}
         {difficulty !== 0 && (
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
-            <b>D1 及以上是标准模式：完整标的、K 线、宏观指标。</b>
+            <b>D1 及以上是实验模式；本次完整演示流程以 D0 的五章与四角色为准。</b>
             {'\n\n'}
             每个按钮、每个指标名都可以把鼠标停上去看说明。
             {'\n\n'}
@@ -387,7 +429,13 @@ export function App() {
   if (engine.config.difficulty === 0) {
     return (
       <BeginnerApp
+        key={runId}
         engine={engine}
+        onExport={exportSave}
+        onStartChapter={id => {
+          setPeriodId(id);
+          createEngine({ seed: engine.config.seed, difficulty: 0, identity: engine.config.identity, timeline: 'historical' }, id);
+        }}
         storageNote={storageNote}
         onChange={() => { persist(engine); forceRender((n) => n + 1); }}
         onRestart={() => {

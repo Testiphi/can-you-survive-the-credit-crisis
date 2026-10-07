@@ -9,6 +9,7 @@ import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
 import { buildHints, FILL_REASON } from './glossary.ts';
 import { nextFundingDecision } from '@cyscc/core';
+import { DEMO_CHAPTERS } from '@cyscc/core';
 import { previewBeginnerTrade } from '@cyscc/core';
 import { OrderPreview } from './OrderPreview.tsx';
 
@@ -56,9 +57,11 @@ interface Props {
   onChange: () => void;
   onRestart: () => void;
   storageNote?: string;
+  onExport: () => void;
+  onStartChapter: (id: string) => void;
 }
 
-export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props) {
+export function BeginnerApp({ engine, onChange, onRestart, storageNote, onExport, onStartChapter }: Props) {
   const [selected, setSelected] = useState('SPX');
   const [trades, setTrades] = useState<Fill[]>(() => engine.turnReports.flatMap(r => r.fills).slice(-6));
   const [fraction, setFraction] = useState(0.5);
@@ -75,6 +78,8 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
 
   const s = engine.summary();
   const chapter = beginnerPeriod(engine.config);
+  const chapterIndex = DEMO_CHAPTERS.findIndex(p => p.id === chapter?.id);
+  const nextChapter = chapterIndex >= 0 ? DEMO_CHAPTERS[chapterIndex + 1] : undefined;
   const fund = engine.state.fund;
   const bank = engine.state.bank;
   const insurer = engine.state.insurer;
@@ -178,12 +183,14 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
             {pct(ret)}{fund ? '（已加回兑付）' : ''}
           </span>
         </div>
+        <button className="ghost" onClick={onExport}>导出存档</button>
         <button className="ghost" onClick={onRestart} {...restartTip}>
           重开
         </button>
       </div>
 
       {storageNote && <div className="b-actions-note" role="status">{storageNote}</div>}
+      {!engine.config.demoVersion && <div className="b-actions-note">此存档按旧版规则与事件数据回放；新开局使用当前演示版修订。</div>}
       {chapter && <div className="banner info">
         <b>{chapter.title}</b> · {engine.config.startDate} 至 {engine.config.endDate} · 剩余 {engine.isOver ? 0 : engine.remainingTurns} 个交易日
         <p>{chapter.briefing}</p>
@@ -376,6 +383,11 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           </div>}
           {engine.isOver && <div className="b-panel">
             <h3>本局复盘</h3>
+            {chapter && <div>
+              <button onClick={() => onStartChapter(chapter.id)}>重新挑战本章</button>
+              {nextChapter && <button onClick={() => onStartChapter(nextChapter.id)}>下一章：{nextChapter.title}</button>}
+              <p>切换章节会重置账户与角色合同，保留角色选择；已达标章节记录保存在本浏览器。</p>
+            </div>}
             <p>{s.bankrupt ? '账户已破产。' : insurer?.defaulted ? '赔款未能按期支付。' : bank?.defaulted ? '融资义务未能按期履行。' : fund?.defaulted ? '投资者赎回未能按期兑付。' : '已完成本局。'} 净收益 {signed(s.equity + distributed - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
             {chapter && <p>本金目标：{review.capitalPreserved && review.survived ? '完成' : '未完成'}；
               回撤挑战：{review.drawdownControlled ? '完成' : '未完成'}；
@@ -519,7 +531,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           </div>
 
           <div className="b-panel">
-            <h3>新闻</h3>
+            <h3>{engine.config.demoVersion && engine.state.turnIndex === 0 ? '开局已知背景' : '新闻'}</h3>
             {news.length === 0 && <div className="dim">还没有消息。点任意操作按钮推进时间。</div>}
             {news.map((n) => (
               <div

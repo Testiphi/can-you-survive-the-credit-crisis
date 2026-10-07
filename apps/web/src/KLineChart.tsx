@@ -14,12 +14,11 @@ import {
   ColorType,
   type IChartApi,
   type ISeriesApi,
-  type CandlestickData,
-  type HistogramData,
   type LineData,
   type Time,
 } from 'lightweight-charts';
 import type { Bar } from '@cyscc/core';
+import { prepareKlineData } from './chart-data.ts';
 
 interface Props {
   bars: Bar[];
@@ -37,6 +36,7 @@ export function KLineChart({ bars, height = 340, instrumentId, showMA = true }: 
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const ma20Ref = useRef<ISeriesApi<'Line'> | null>(null);
   const ma60Ref = useRef<ISeriesApi<'Line'> | null>(null);
+  const estimateRef = useRef<ISeriesApi<'Line'> | null>(null);
 
   // 创建图表（只做一次）
   useEffect(() => {
@@ -74,6 +74,8 @@ export function KLineChart({ bars, height = 340, instrumentId, showMA = true }: 
       priceScaleId: 'volume',
       color: '#2a3646',
     });
+    const estimate = chart.addLineSeries({ color: '#9aa6b2', lineStyle: 2, lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    estimateRef.current = estimate;
     chart.priceScale('volume').applyOptions({
       scaleMargins: { top: 0.82, bottom: 0 },
     });
@@ -112,6 +114,7 @@ export function KLineChart({ bars, height = 340, instrumentId, showMA = true }: 
       volumeRef.current = null;
       ma20Ref.current = null;
       ma60Ref.current = null;
+      estimateRef.current = null;
     };
   }, [height]);
 
@@ -122,22 +125,10 @@ export function KLineChart({ bars, height = 340, instrumentId, showMA = true }: 
     const chart = chartRef.current;
     if (!candles || !volume || !chart) return;
 
-    const candleData: CandlestickData<Time>[] = bars.map((b) => ({
-      time: b.date as Time,
-      open: b.open,
-      high: b.high,
-      low: b.low,
-      close: b.close,
-    }));
-
-    const volumeData: HistogramData<Time>[] = bars.map((b) => ({
-      time: b.date as Time,
-      value: b.volume,
-      color: b.close >= b.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
-    }));
-
-    candles.setData(candleData);
-    volume.setData(volumeData);
+    const data = prepareKlineData(bars);
+    candles.setData(data.candles);
+    volume.setData(data.volumes);
+    estimateRef.current?.setData(data.estimates);
     ma20Ref.current?.setData(movingAverageSeries(bars, 20, showMA));
     ma60Ref.current?.setData(movingAverageSeries(bars, 60, showMA));
 
@@ -146,7 +137,11 @@ export function KLineChart({ bars, height = 340, instrumentId, showMA = true }: 
     chart.timeScale().setVisibleLogicalRange({ from, to: bars.length + 6 });
   }, [bars, instrumentId, showMA]);
 
-  return <div ref={containerRef} style={{ width: '100%' }} />;
+  const estimatedCount = prepareKlineData(bars).estimatedCount;
+  return <div>
+    {estimatedCount > 0 && <div className="hint info">当前可见历史中有 {estimatedCount} 天缺少完整日内行情，灰色虚线表示估算收盘值，该段不显示蜡烛和成交量；均线含这些估算值。</div>}
+    <div ref={containerRef} style={{ width: '100%' }} />
+  </div>;
 }
 
 /** 计算移动平均序列。show=false 时返回空数据，等效于隐藏（用滚动窗口，O(n)）。 */
