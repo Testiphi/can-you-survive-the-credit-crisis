@@ -44,11 +44,11 @@ test('D0 oversized orders are capped inside the engine, including repeated queue
 });
 
 
-test('D0 normalizes unsupported institution identities before choosing starting capital', () => {
+test('D0 preserves the supported teaching identities and their starting capital', () => {
   for (const identity of ['retail', 'insurer'] as const) {
     const e = new GameEngine(loadDataset(), { config: { difficulty: 0, identity } });
-    assert.equal(e.config.identity, 'retail');
-    assert.equal(e.config.initialCapital, 100000);
+    assert.equal(e.config.identity, identity);
+    assert.equal(e.config.initialCapital, identity === 'retail' ? 100000 : 1e10);
     assert.equal(e.state.agents.length, 0);
   }
   const advanced = new GameEngine(loadDataset(), { config: { difficulty: 2, identity: 'bank' } });

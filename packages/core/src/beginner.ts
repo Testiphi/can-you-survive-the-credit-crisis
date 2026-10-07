@@ -1,5 +1,5 @@
 import type { Account, Fill } from './types.ts';
-import { applyFill, markToMarket, loanLiabilities } from './portfolio.ts';
+import { applyFill, markToMarket, loanLiabilities, insuranceNetLiability } from './portfolio.ts';
 
 /** 教学规则，不随事件、评级或市场压力改变。 */
 export const BEGINNER_RULES = {
@@ -58,7 +58,7 @@ export function limitBeginnerFill(account: Account, prices: Map<string, number>,
   const sign = fill.order.side === 'buy' ? 1 : -1;
   const price = fill.price;
   const feePerShare = fill.commission / fill.quantity;
-  let equity = account.cash - loanLiabilities(account);
+  let equity = account.cash - loanLiabilities(account) - insuranceNetLiability(account);
   let otherExposure = 0;
   for (const pos of account.positions.values()) {
     const p = prices.get(pos.instrumentId) ?? pos.avgPrice;

@@ -11,6 +11,7 @@ import { BEGINNER_RULES, limitBeginnerFill, settleBeginnerRisk } from './beginne
 import { fingerprint, SAVE_VERSION, validateSave, type GameSave } from './save.ts';
 import { createFund, settleFund } from './fund.ts';
 import { BANK_RULES, initializeBank, settleBank } from './bank.ts';
+import { createInsurer, settleInsurance } from './insurance.ts';
 import type {
   Account,
   Bar,
@@ -153,7 +154,7 @@ export class GameEngine {
 
     const difficulty = options.config?.difficulty ?? DEFAULT_CONFIG.difficulty;
     const requestedIdentity = options.config?.identity ?? DEFAULT_CONFIG.identity;
-    const identity = difficulty === 0 && !['hedge_fund', 'bank'].includes(requestedIdentity) ? 'retail' : requestedIdentity;
+    const identity = requestedIdentity;
     const profile = IDENTITY_PROFILE[identity];
     this.config = {
       ...DEFAULT_CONFIG,
@@ -242,6 +243,7 @@ export class GameEngine {
     if (difficulty === 0 && identity === 'bank') initializeBank(account, prices, this.config);
 
     this.state = {
+      ...(difficulty === 0 && identity === 'insurer' ? { insurer: createInsurer(this.config) } : {}),
       ...(difficulty === 0 && identity === 'bank' ? { bank: { defaulted: false } } : {}),
       ...(difficulty === 0 && identity === 'hedge_fund' ? { fund: createFund(this.config) } : {}),
       config: this.config,
@@ -283,7 +285,7 @@ export class GameEngine {
   }
 
   get isOver(): boolean {
-    return this.state.date >= this.config.endDate || this.state.player.bankrupt || this.state.fund?.defaulted === true || this.state.bank?.defaulted === true;
+    return this.state.date >= this.config.endDate || this.state.player.bankrupt || this.state.fund?.defaulted === true || this.state.bank?.defaulted === true || this.state.insurer?.defaulted === true;
   }
 
   /** 剩余交易日数 */
@@ -305,6 +307,11 @@ export class GameEngine {
     if (!this.state.bank || this.isOver) throw new Error('当前不能提交银行偿债指令');
     if (this.state.bankRefinancePending) throw new Error('同一回合不能同时申请展期与提前偿债');
     this.state.bankRepaymentPending = true;
+  }
+
+  requestReinsurance(): void {
+    if (!this.state.insurer || this.isOver || this.state.reinsurancePending) throw new Error('当前不能提交再保险指令');
+    this.state.reinsurancePending = true;
   }
 
   requestBankRefinance(request: RefinanceRequest): void {
@@ -585,6 +592,9 @@ export class GameEngine {
       this.state.bank.defaulted = banking.defaulted;
       newNews.push(...banking.news);
     }
+    const insurance = this.state.insurer ? settleInsurance(this.state.insurer, this.state.player, this.state.prices,
+      this.config, nextDate, this.state.macro.systemicStress, this.state.reinsurancePending === true) : undefined;
+    if (insurance) newNews.push(...insurance.news);
     markToMarket(this.state.player, this.state.prices);
 
     // ---- 9) 回购融资与被迫卖出 ----
@@ -623,10 +633,11 @@ export class GameEngine {
     this.state.score.push(snap);
 
     // ---- 14) 记账与清理 ----
-    if (this.state.pendingOrders.length > 0 || this.state.bankRepaymentPending || this.state.bankRefinancePending) {
+    if (this.state.pendingOrders.length > 0 || this.state.bankRepaymentPending || this.state.bankRefinancePending || this.state.reinsurancePending) {
       const action: PlayerAction = { turnIndex: this.state.turnIndex, date: nextDate, orders: this.state.pendingOrders,
         ...(this.state.bankRepaymentPending ? { repayLoans: true } : {}),
-        ...(this.state.bankRefinancePending ? { refinance: { ...this.state.bankRefinancePending } } : {}) };
+        ...(this.state.bankRefinancePending ? { refinance: { ...this.state.bankRefinancePending } } : {}),
+        ...(this.state.reinsurancePending ? { buyReinsurance: true } : {}) };
       this.state.news.push(...newNews);
       this.state.pendingOrders = [];
       this.actions.push(structuredClone(action));
@@ -635,13 +646,17 @@ export class GameEngine {
     }
     delete this.state.bankRepaymentPending;
     delete this.state.bankRefinancePending;
+    delete this.state.reinsurancePending;
 
     this.prevPrices = new Map(this.state.prices);
 
     const commission = fills.reduce((sum, fill) => sum + fill.commission, 0);
     this.reports.push({
       date: nextDate, equityBefore, equityAfter: this.state.player.equity,
-      marketPnl: this.state.player.equity - equityBefore + commission + borrowFees + (redemption?.capitalOutflow ?? 0) + (banking?.loanInterest ?? 0) + (banking?.financingFees ?? 0),
+      marketPnl: this.state.player.equity - equityBefore + commission + borrowFees + (redemption?.capitalOutflow ?? 0) + (banking?.loanInterest ?? 0) + (banking?.financingFees ?? 0)
+        - (insurance?.premiumIncome ?? 0) + (insurance?.claimExpense ?? 0) + (insurance?.reinsurancePremium ?? 0),
+      ...(insurance ? { premiumIncome: insurance.premiumIncome, claimExpense: insurance.claimExpense,
+        reinsurancePremium: insurance.reinsurancePremium, claimsPaid: insurance.claimsPaid, recoveriesReceived: insurance.recoveriesReceived } : {}),
       ...(banking?.financingFees ? { financingFees: banking.financingFees } : {}),
       ...(banking ? { loanInterest: banking.loanInterest, principalRepaid: banking.principalRepaid, interestPaid: banking.interestPaid } : {}),
       ...(redemption ? { capitalOutflow: redemption.capitalOutflow } : {}),
@@ -1242,6 +1257,7 @@ export class GameEngine {
       pendingOrders: structuredClone(this.state.pendingOrders),
       ...(this.state.bankRepaymentPending ? { bankRepaymentPending: true } : {}),
       ...(this.state.bankRefinancePending ? { bankRefinancePending: { ...this.state.bankRefinancePending } } : {}),
+      ...(this.state.reinsurancePending ? { reinsurancePending: true } : {}),
       stateHash: fingerprint(this.state),
     };
   }
@@ -1258,6 +1274,7 @@ export class GameEngine {
       if (action?.turnIndex === turn) {
         if (action.repayLoans) engine.requestBankRepayment();
         if (action.refinance) engine.requestBankRefinance(action.refinance);
+        if (action.buyReinsurance) engine.requestReinsurance();
         for (const order of action.orders) engine.submitOrder(order);
         cursor++;
       }
@@ -1267,6 +1284,7 @@ export class GameEngine {
     for (const order of input.pendingOrders) engine.submitOrder(order);
     if (input.bankRepaymentPending) engine.requestBankRepayment();
     if (input.bankRefinancePending) engine.requestBankRefinance(input.bankRefinancePending);
+    if (input.reinsurancePending) engine.requestReinsurance();
     if (engine.state.date !== input.date || fingerprint(engine.state) !== input.stateHash) {
       throw new Error('存档回放校验失败，原存档已保留');
     }

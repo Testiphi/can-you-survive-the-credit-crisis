@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { Fill, GameEngine } from '@cyscc/core';
-import { BEGINNER_RULES, beginnerPeriod, reviewRun, fundAvailableCash, BANK_RULES, loanLiabilities, collateralState, refinanceQuote, nextTradingDay } from '@cyscc/core';
+import { BEGINNER_RULES, beginnerPeriod, reviewRun, fundAvailableCash, BANK_RULES, loanLiabilities, collateralState, refinanceQuote, nextTradingDay, INSURANCE_RULES, reinsurancePrice } from '@cyscc/core';
 
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
@@ -74,11 +74,12 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
   const chapter = beginnerPeriod(engine.config);
   const fund = engine.state.fund;
   const bank = engine.state.bank;
+  const insurer = engine.state.insurer;
   const collateral = bank ? collateralState(engine.state.player, engine.state.prices, engine.state.macro.systemicStress) : undefined;
-  const obligationsFailed = !!(fund?.defaulted || bank?.defaulted);
+  const obligationsFailed = !!(fund?.defaulted || bank?.defaulted || insurer?.defaulted);
   const distributed = engine.state.player.distributedCapital ?? 0;
-  const roleName = bank ? '银行资金经理（教学版）' : fund ? '基金经理（教学版）' : '散户';
-  const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports, fund ?? bank);
+  const roleName = insurer ? '保险公司（教学版）' : bank ? '银行资金经理（教学版）' : fund ? '基金经理（教学版）' : '散户';
+  const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports, fund ?? bank ?? insurer);
   const lastReport = engine.turnReports.at(-1);
   const inst = D0_INSTRUMENTS.find((i) => i.id === selected) ?? D0_INSTRUMENTS[0];
   const bars = useMemo(
@@ -101,7 +102,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
         const res = e.advance();
         advanced++;
         if (res.fills.length > 0) log.push(...res.fills);
-        const fundNotice = res.news.some(n => n.id.startsWith('fund-') || n.id.startsWith('bank-'));
+        const fundNotice = res.news.some(n => n.id.startsWith('fund-') || n.id.startsWith('bank-') || n.id.startsWith('insurance-'));
         if (e.isOver || fundNotice || res.marginCall || res.fills.length > 0 || res.firedEventIds.length > 0 || res.equity + (e.state.player.distributedCapital ?? 0) <= startingEquity * 0.97) {
           reason = e.isOver ? '本局结束' : fundNotice ? '请查看资金到期与偿付安排' : res.marginCall ? '需要处理账户风险' : res.fills.length > 0 ? '请查看成交结果' : res.firedEventIds.length > 0 ? '出现新事件' : '期间净值下跌达到 3%';
           break;
@@ -183,7 +184,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
       {chapter && <div className="banner info">
         <b>{chapter.title}</b> · {engine.config.startDate} 至 {engine.config.endDate} · 剩余 {engine.isOver ? 0 : engine.remainingTurns} 个交易日
         <p>{chapter.briefing}</p>
-        <p>目标：结束时保留至少 {money(engine.config.initialCapital * chapter.capitalFloor)} {fund ? '净资产与累计兑付之和，并完成全部到期兑付' : bank ? '净资产，并按期清偿全部借款' : '净资产'}。
+        <p>目标：结束时保留至少 {money(engine.config.initialCapital * chapter.capitalFloor)} {fund ? '净资产与累计兑付之和，并完成全部到期兑付' : bank ? '净资产，并按期清偿全部借款' : insurer ? '净资产，并按期支付全部赔款' : '净资产'}。
         风控挑战：最大回撤不超过 {pct(chapter.drawdownLimit)}，且不触发自动回补。保留现金同样可以完成目标。</p>
       </div>}
       {bank && <div className={`banner ${bank.defaulted ? 'danger' : 'info'}`}>
@@ -219,6 +220,22 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           engine.requestBankRepayment(); advanceSession([], 1);
         }}>提前偿债（用可用现金，推进一天）</button>
         <p>指令在下一交易日收盘执行，先支付应计利息，再按到期顺序还本金，允许部分提前偿还。还本同时减少现金和负债，不计作亏损。</p>
+      </div>}
+      {insurer && <div className={`banner ${insurer.defaulted ? 'danger' : 'info'}`}>
+        <b>赔付安排与再保险</b>
+        <p>每笔赔款按确认日系统压力计算，为初始资本的 3%—20%，确认后下一交易日支付。
+        当前压力 {pct(engine.state.macro.systemicStress)}；可支付现金 {money(fundAvailableCash(engine.state.player, engine.state.prices))}。</p>
+        {insurer.claims.map(c => <div key={c.assessmentDate}>
+          {c.assessmentDate} 确认 → {c.dueDate} 支付 · {c.status === 'scheduled' ? '金额待确认' : `应付 ${money(c.grossAmount ?? 0)}，再保险回款 ${money(c.recovery ?? 0)}`} · {c.status === 'paid' ? '已支付' : c.status === 'missed' ? '未支付' : '待处理'}
+        </div>)}
+        <p>现有保单在最后赔付日前每日收入初始资本的 {(INSURANCE_RULES.dailyPremium * 100).toFixed(2)}%；赔案确认当日计入损失，支付时不重复扣减净资产。
+        再保险在赔付日到账，本教学版不模拟再保险方违约。</p>
+        {insurer.coverage ? <p>再保险已生效：一次性保费 {money(insurer.coverage.premium)}。
+          每笔先自留初始资本的 5%，超出部分由再保险承担 50%。</p> : <>
+          <p>可选再保险：当前估计保费 {money(reinsurancePrice(engine.config.initialCapital, engine.state.macro.systemicStress))}，一次性支付；每笔赔款超过初始资本 5% 的部分，赔付 50%。必须在 {insurer.purchaseDeadline} 收盘前成交。</p>
+          <button disabled={engine.isOver || nextTradingDay(engine.state.date) > insurer.purchaseDeadline} onClick={() => { engine.requestReinsurance(); advanceSession([], 1); }}>购买再保险（推进一天）</button>
+          <p>次日按当时压力重算报价并检查现金；购买后不退费。也可以保留现金，自行承担赔款。</p>
+        </>}
       </div>}
       {fund && <div className={`banner ${fund.defaulted ? 'danger' : 'info'}`}>
         <b>投资者赎回安排</b> · 当前可兑付现金 {money(fundAvailableCash(engine.state.player, engine.state.prices))}
@@ -285,6 +302,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
             <div className="banner info">本局已到达 {engine.config.endDate}。查看右侧复盘了解资金变化。</div>
           )}
           {bank?.defaulted && <div className="banner danger">未能按时履行融资义务，本局结束。未偿本金和利息仍计入负债。</div>}
+          {insurer?.defaulted && <div className="banner danger">赔款未能按期支付，本局结束。未付赔款继续计入负债。</div>}
           {fund?.defaulted && <div className="banner danger">未能按时兑付投资者赎回，本局结束。未支付金额没有从账户扣除。</div>}
           {s.bankrupt && (
             <div className="banner danger">
@@ -338,18 +356,26 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
               <div className="line">当日借款利息成本：−{exactMoney(lastReport.loanInterest)}</div>
               <div className="line">偿债现金流：本金 {exactMoney(lastReport.principalRepaid ?? 0)}，已计提利息 {exactMoney(lastReport.interestPaid ?? 0)}（不重复扣减净资产）</div>
             </>}
+            {lastReport.premiumIncome !== undefined && <>
+              <div className="line">保费收入：+{exactMoney(lastReport.premiumIncome)}</div>
+              <div className="line">新确认净赔款损失：−{exactMoney(lastReport.claimExpense ?? 0)}</div>
+              <div className="line">购买再保险：−{exactMoney(lastReport.reinsurancePremium ?? 0)}</div>
+              <div className="line">赔付现金流：支付 {exactMoney(lastReport.claimsPaid ?? 0)}，再保险到账 {exactMoney(lastReport.recoveriesReceived ?? 0)}（不重复记损益）</div>
+            </>}
             <div className="line">期末净资产：{exactMoney(lastReport.equityAfter)}</div>
           </div>}
           {engine.isOver && <div className="b-panel">
             <h3>本局复盘</h3>
-            <p>{s.bankrupt ? '账户已破产。' : bank?.defaulted ? '融资义务未能按期履行。' : fund?.defaulted ? '投资者赎回未能按期兑付。' : '已完成本局。'} 净收益 {signed(s.equity + distributed - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
+            <p>{s.bankrupt ? '账户已破产。' : insurer?.defaulted ? '赔款未能按期支付。' : bank?.defaulted ? '融资义务未能按期履行。' : fund?.defaulted ? '投资者赎回未能按期兑付。' : '已完成本局。'} 净收益 {signed(s.equity + distributed - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
             {chapter && <p>本金目标：{review.capitalPreserved && review.survived ? '完成' : '未完成'}；
               回撤挑战：{review.drawdownControlled ? '完成' : '未完成'}；
               避免自动回补：{review.noForcedClose ? '完成' : '未完成'}。</p>}
             <p>累计手续费 {money(review.commissions)}，做空持有费 {money(review.borrowFees)}{bank ? `，借款利息 ${money(review.loanInterest)}，展期手续费 ${money(review.financingFees)}` : ''}，自动回补 {review.riskCloses} 次。</p>
+            {insurer && <p>累计保费收入 {money(review.premiumIncome)}，已确认净赔款损失 {money(review.claimExpense)}，再保险保费 {money(review.reinsurancePremium)}。</p>}
             {review.worstDay && review.worstDay.equityAfter + (review.worstDay.capitalOutflow ?? 0) < review.worstDay.equityBefore && <p>
               最大单日净损失发生在 {review.worstDay.date}：{money(review.worstDay.equityBefore - review.worstDay.equityAfter - (review.worstDay.capitalOutflow ?? 0))}。
               当日持仓与交易价差 {signed(review.worstDay.marketPnl)}，费用合计 {money(review.worstDay.commission + review.worstDay.borrowFees + (review.worstDay.loanInterest ?? 0) + (review.worstDay.financingFees ?? 0))}。
+              {insurer && <>当日保费收入 {money(review.worstDay.premiumIncome ?? 0)}，确认净赔款损失 {money(review.worstDay.claimExpense ?? 0)}，再保险保费 {money(review.worstDay.reinsurancePremium ?? 0)}。</>}
               {review.worstDay.fills.some(f => f.reason === 'risk_close') ? '当日触及空头风险底线并自动回补。' : ''}
             </p>}
             <p>复盘只依据本局实际成交与每日净值，未把同时出现的新闻认定为损失的唯一原因。</p>
@@ -385,6 +411,10 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
                 <span>持仓总额（多空绝对值）</span>
                 <b>{money(marketValue)}</b>
               </div>
+              {insurer && <>
+                <div className="line"><span>未付赔款负债</span><b>{money(engine.state.player.claimsPayable ?? 0)}</b></div>
+                <div className="line"><span>应收再保险回款</span><b>{money(engine.state.player.reinsuranceReceivable ?? 0)}</b></div>
+              </>}
               {bank && <div className="line"><span>借款本金与应计利息</span><b>{money(loanLiabilities(engine.state.player))}</b></div>}
               <div className="line total">
                 <span>净资产</span>

@@ -18,6 +18,10 @@ export function loanLiabilities(account: Account): Money {
   return (account.loans ?? []).reduce((sum, loan) => sum + loan.principal + loan.accruedInterest, 0);
 }
 
+export function insuranceNetLiability(account: Account): Money {
+  return (account.claimsPayable ?? 0) - (account.reinsuranceReceivable ?? 0);
+}
+
 export function createAccount(initialCapital: Money): Account {
   return {
     cash: initialCapital,
@@ -96,7 +100,7 @@ export function markToMarket(account: Account, prices: Map<string, number>): voi
     if (p === undefined) continue;
     positionsValue += pos.quantity * p;
   }
-  account.equity = account.cash + positionsValue - loanLiabilities(account);
+  account.equity = account.cash + positionsValue - loanLiabilities(account) - insuranceNetLiability(account);
 
   const performanceEquity = account.equity + (account.distributedCapital ?? 0);
   if (performanceEquity > account.peakEquity) account.peakEquity = performanceEquity;

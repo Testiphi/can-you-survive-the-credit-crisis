@@ -229,6 +229,8 @@ export interface Position {
 }
 
 export interface Account {
+  claimsPayable?: Money;
+  reinsuranceReceivable?: Money;
   loans?: Loan[];
   /** 教学基金已返还投资者的资本，供收益和回撤剔除外部现金流。 */
   distributedCapital?: Money;
@@ -345,6 +347,7 @@ export interface NPCAgent {
 // ---------------------------------------------------------------- 状态与结果
 
 export interface PlayerAction {
+  buyReinsurance?: boolean;
   refinance?: RefinanceRequest;
   repayLoans?: boolean;
   turnIndex: number;
@@ -359,6 +362,8 @@ export interface ScoreSnapshot {
 }
 
 export interface GameState {
+  insurer?: InsurerState;
+  reinsurancePending?: boolean;
   bank?: BankState;
   bankRefinancePending?: RefinanceRequest;
   bankRepaymentPending?: boolean;
@@ -395,6 +400,11 @@ export interface TurnResult {
 }
 
 export interface TurnReport {
+  premiumIncome?: Money;
+  claimExpense?: Money;
+  reinsurancePremium?: Money;
+  claimsPaid?: Money;
+  recoveriesReceived?: Money;
   financingFees?: Money;
   loanInterest?: Money;
   principalRepaid?: Money;
@@ -434,6 +444,17 @@ export interface BankState {
 export interface RefinanceRequest {
   loanId: string;
   plan: 'secured' | 'term';
+}
+
+export interface InsurerState {
+  defaulted: boolean;
+  purchaseDeadline: DateStr;
+  coverage?: { purchasedOn: DateStr; premium: Money };
+  claims: Array<{
+    assessmentDate: DateStr; dueDate: DateStr;
+    status: 'scheduled' | 'due' | 'paid' | 'missed';
+    grossAmount?: Money; recovery?: Money;
+  }>;
 }
 
 // ---------------------------------------------------------------- 真实历史数据

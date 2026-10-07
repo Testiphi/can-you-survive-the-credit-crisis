@@ -2,6 +2,7 @@ import type { GameConfig, Order, PlayerAction, RefinanceRequest } from './types.
 
 export const SAVE_VERSION = 1;
 export interface GameSave {
+  reinsurancePending?: boolean;
   bankRefinancePending?: RefinanceRequest;
   bankRepaymentPending?: boolean;
   version: number;
@@ -28,7 +29,7 @@ export function validateSave(value: unknown): asserts value is GameSave {
   if (!value || typeof value !== 'object') throw new Error('存档格式无效');
   const s = value as GameSave;
   if (s.version !== SAVE_VERSION) throw new Error('存档版本不兼容，请保留原存档');
-  if (!s.config || s.config.difficulty !== 0 || !['retail', 'hedge_fund', 'bank'].includes(s.config.identity) || s.config.timeline !== 'historical') {
+  if (!s.config || s.config.difficulty !== 0 || !['retail', 'hedge_fund', 'bank', 'insurer'].includes(s.config.identity) || s.config.timeline !== 'historical') {
     throw new Error('目前只支持恢复 D0 历史模式存档');
   }
   if (!Number.isFinite(s.config.initialCapital) || s.config.initialCapital <= 0 ||
@@ -46,6 +47,10 @@ export function validateSave(value: unknown): asserts value is GameSave {
     if (!request || s.config.identity !== 'bank' || repay || typeof request.loanId !== 'string' || !['secured', 'term'].includes(request.plan)) throw new Error('存档展期指令无效');
   };
   checkRefinance(s.bankRefinancePending, s.bankRepaymentPending);
+  const checkReinsurance = (value: boolean | undefined) => {
+    if (value !== undefined && (typeof value !== 'boolean' || s.config.identity !== 'insurer')) throw new Error('存档再保险指令无效');
+  };
+  checkReinsurance(s.reinsurancePending);
   if (s.bankRepaymentPending !== undefined && (typeof s.bankRepaymentPending !== 'boolean' || s.config.identity !== 'bank')) throw new Error('存档偿债指令无效');
   let previous = 0;
   for (const action of s.actions) {
@@ -53,6 +58,7 @@ export function validateSave(value: unknown): asserts value is GameSave {
         !Array.isArray(action.orders) || action.orders.length > 1000) throw new Error('操作日志无效');
     previous = action.turnIndex;
     checkRefinance(action.refinance, action.repayLoans);
+    checkReinsurance(action.buyReinsurance);
     if (action.repayLoans !== undefined && (typeof action.repayLoans !== 'boolean' || s.config.identity !== 'bank')) throw new Error('操作日志偿债指令无效');
   }
 }
