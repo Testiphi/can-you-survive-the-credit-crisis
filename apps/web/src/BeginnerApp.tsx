@@ -208,6 +208,10 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
                 </span>
               </div>
               <p className="desc">{inst.desc}</p>
+              <p className="desc">
+                行情来源：{last?.provenance === 'historical' ? '数据集历史日线' : last?.provenance === 'estimated' ? '数据集简化或回填日线，开盘价未必是历史真实开盘价' : last?.provenance === 'carried' ? '当日数据缺失，沿用上一日估值；暂停该标的交易' : '合成估算价格'}。
+                历史日线不叠加事件涨跌；新闻在事件日期或下一交易日显示。
+              </p>
             </div>
           </div>
 
@@ -402,7 +406,7 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
 
       <div className="disclaimer">
         历史模拟，非投资建议。种子 {engine.config.seed} · 难度 D0（新手模式）· 数据来源{' '}
-        {engine.config.timeline === 'historical' ? '历史回放' : '小幅抖动'}
+        历史时间线（行情含简化数据，以面板来源说明为准）
       </div>
     </div>
   );

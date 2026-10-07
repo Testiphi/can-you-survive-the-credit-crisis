@@ -147,6 +147,7 @@ export class GameEngine {
       ...DEFAULT_CONFIG,
       ...options.config,
       identity,
+      timeline: difficulty === 0 ? 'historical' : options.config?.timeline ?? DEFAULT_CONFIG.timeline,
       initialCapital: options.config?.initialCapital ?? profile.capital,
     };
 
@@ -184,7 +185,7 @@ export class GameEngine {
     };
 
     // 三种时间线模式的真正区别：事件日期围绕史实日期的抖动幅度
-    const jitterDays = options.jitterDays ?? JITTER_BY_TIMELINE[this.config.timeline];
+    const jitterDays = difficulty === 0 ? 0 : options.jitterDays ?? JITTER_BY_TIMELINE[this.config.timeline];
 
     this.scenario = new ScenarioEngine(dataset.events, dataset.institutions, {
       timeline: this.config.timeline,
@@ -204,7 +205,9 @@ export class GameEngine {
     const bars = new Map<string, Bar[]>();
     const prices = new Map<string, number>();
     for (const inst of INSTRUMENTS) {
-      const realFirst = this.realPrices?.firstBar(inst.id);
+      const realFirst = difficulty === 0
+        ? this.realPrices?.barOnOrBefore(inst.id, this.config.startDate)
+        : this.realPrices?.firstBar(inst.id);
       const startPrice = realFirst ? realFirst.close : inst.startPrice;
       prices.set(inst.id, startPrice);
       this.prevPrices.set(inst.id, startPrice);
@@ -212,6 +215,7 @@ export class GameEngine {
       bars.set(inst.id, [
         {
           date: this.config.startDate,
+          provenance: difficulty === 0 ? (realFirst ? 'estimated' : 'synthetic') : undefined,
           open: startPrice,
           high: startPrice,
           low: startPrice,
@@ -318,6 +322,7 @@ export class GameEngine {
       idx !== undefined ? this.baseMacro[idx] : { ...this.baseMacro[this.baseMacro.length - 1], date: nextDate };
     const prevBase = idx !== undefined && idx > 0 ? this.baseMacro[idx - 1] : base;
 
+    const previousDate = this.state.date;
     // ---- 0) 时间推进 ----
     this.state.date = nextDate;
     this.state.turnIndex += 1;
@@ -329,7 +334,15 @@ export class GameEngine {
 
     // ---- 2) 事件注入 ----
     const ctx = this.buildContext(base);
-    const decisions = this.scenario.tick(ctx, this.streams.scenario, this.state.institutions);
+    // D0 按日历播放已发生的历史，不让状态谓词、竞争风险或同日前置链推迟新闻。
+    // 周末事件在下一交易日显示；中途开始不会把全部过去事件挤到第一天。
+    const decisions: FireDecision[] = this.config.difficulty === 0
+      ? this.scenario.cards.filter(card => {
+          const modeOnly = card.trigger.type === 'scheduled' ? card.trigger.modeOnly : undefined;
+          return (!modeOnly || modeOnly === 'historical') && card.date <= nextDate &&
+            (card.date > previousDate || (this.state.turnIndex === 1 && card.date === previousDate));
+        }).map(card => ({ card, forced: false }))
+      : this.scenario.tick(ctx, this.streams.scenario, this.state.institutions);
     const firedEventIds: string[] = [];
     const newNews: NewsItem[] = [];
 
@@ -401,6 +414,23 @@ export class GameEngine {
       const prevClose = this.state.prices.get(inst.id) ?? inst.startPrice;
       const prevAdv = this.adv20.get(inst.id) ?? inst.baseAdv;
 
+      if (this.config.difficulty === 0 && this.realPrices?.has(inst.id)) {
+        const historical = this.realPrices.barFor(inst.id, nextDate);
+        const volume = historical?.volume ?? 0;
+        const close = historical?.close ?? prevClose;
+        const adv20 = volume > 0 ? prevAdv * 0.9 + volume * close * 0.1 : prevAdv;
+        newBars.set(inst.id, {
+          date: nextDate,
+          open: historical?.open ?? prevClose,
+          high: historical?.high ?? prevClose,
+          low: historical?.low ?? prevClose,
+          close, volume, adv20,
+          provenance: !historical ? 'carried' : historical.filled || volume === 0 ? 'estimated' : 'historical',
+        });
+        this.adv20.set(inst.id, adv20);
+        continue;
+      }
+
       // ---- 真实历史路径 ----
       // 标普由下方的基础路径兜底（它已经用真实序列驱动），其余标的直接用
       // 真实 K 线乘以事件扰动乘数。
@@ -463,6 +493,7 @@ export class GameEngine {
         prevAdv,
         extra,
       );
+      if (this.config.difficulty === 0) bar.provenance = 'synthetic';
 
       // 已死亡机构（破产 / 被接管 / 被收购）的股票必须**单向衰减**。
       // 否则它会像活着的公司一样随机游走，甚至「恢复」——
@@ -483,10 +514,12 @@ export class GameEngine {
     const spxBars = this.state.bars.get('SPX')!;
     const prevSpxClose = spxBars[spxBars.length - 1].close;
     const spxBar = newBars.get('SPX')!;
-    spxBar.close = round2(Math.max(1, base.spx * this.indexShockMultiplier));
-    spxBar.open = round2(prevSpxClose * (1 + spxReturn * 0.4));
-    spxBar.high = round2(Math.max(spxBar.open, spxBar.close) * 1.004);
-    spxBar.low = round2(Math.min(spxBar.open, spxBar.close) * 0.996);
+    if (!(this.config.difficulty === 0 && this.realPrices?.has('SPX'))) {
+      spxBar.close = round2(Math.max(1, base.spx * this.indexShockMultiplier));
+      spxBar.open = round2(prevSpxClose * (1 + spxReturn * 0.4));
+      spxBar.high = round2(Math.max(spxBar.open, spxBar.close) * 1.004);
+      spxBar.low = round2(Math.min(spxBar.open, spxBar.close) * 0.996);
+    }
 
     // 落盘
     for (const [id, bar] of newBars) {
@@ -521,12 +554,13 @@ export class GameEngine {
 
     // ---- 10) 保证金检查与强平 ----
     if (this.config.difficulty === 0) {
-      const riskFills = settleBeginnerRisk(this.state.player, this.state.prices, nextDate, COMMISSION_RATE);
+      const unavailable = new Set([...newBars].filter(([, b]) => b.provenance === 'carried').map(([id]) => id));
+      const riskFills = settleBeginnerRisk(this.state.player, this.state.prices, nextDate, COMMISSION_RATE, unavailable);
       fills.push(...riskFills);
       if (riskFills.length > 0) newNews.push({
         id: `risk-close-${nextDate}`, date: nextDate, source: 'system', credibility: 1, isTrue: true,
         headline: '空头风险底线触发，已自动平仓',
-        body: '收盘净资产低于空头市值的 30%，系统按本日收盘价买回全部空头，并收取正常手续费。没有额外惩罚滑点；跳空仍可能使损失超过本金。',
+        body: '收盘净资产低于空头市值的 30%，系统按本日收盘价买回有报价的空头，并收取正常手续费。缺失报价的持仓等待恢复报价后处理。没有额外惩罚滑点；跳空仍可能使损失超过本金。',
       });
     } else {
       this.settleMargin(newBars, nextDate, fills);
@@ -769,6 +803,10 @@ export class GameEngine {
       const bar = newBars.get(order.instrumentId);
       const inst = INSTRUMENT_BY_ID.get(order.instrumentId);
       if (!bar || !inst) continue;
+      if (this.config.difficulty === 0 && bar.provenance === 'carried') {
+        fills.push({ order, filledAt: date, price: bar.open, quantity: 0, impact: 0, commission: 0, reason: 'missing_quote' });
+        continue;
+      }
 
       // 券源约束：只能借到有限的券（见 securities-lending.ts）。
       // 注意传的是**绝对容量** capacityShares，不是 headroomShares——

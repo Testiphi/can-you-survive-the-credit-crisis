@@ -264,6 +264,7 @@ def main() -> int:
                 "low": round(r["low"], 2),
                 "close": round(r["close"], 2),
                 "volume": r["volume"],
+                **({"filled": True} if r.get("filled") else {}),
             }
             for r in aligned
         ]

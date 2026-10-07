@@ -79,6 +79,15 @@ export class RealPriceSource {
     return first;
   }
 
+  /** 不读取起始日期之后的数据作为期初估值。 */
+  barOnOrBefore(instrumentId: string, date: DateStr): MarketBar | undefined {
+    let latest: MarketBar | undefined;
+    for (const bar of this.byInstrument.get(instrumentId)?.values() ?? []) {
+      if (bar.date <= date && (!latest || bar.date > latest.date)) latest = bar;
+    }
+    return latest;
+  }
+
   /** 标普的收盘价序列，交给宏观模块作为基础路径。 */
   spxSeries(): Map<DateStr, number> {
     return this.spxByDate;

@@ -282,7 +282,7 @@ export function App() {
             <span>
               <Tip text={BUTTON_TIPS.timeline}>时间线模式 ⓘ</Tip>
             </span>
-            <select value={timeline} onChange={(e) => setTimeline(e.target.value as TimelineMode)}>
+            <select value={difficulty === 0 ? 'historical' : timeline} disabled={difficulty === 0} onChange={(e) => setTimeline(e.target.value as TimelineMode)}>
               {(Object.keys(TIMELINE_LABEL) as TimelineMode[]).map((k) => (
                 <option key={k} value={k}>
                   {TIMELINE_LABEL[k]}
@@ -305,7 +305,7 @@ export function App() {
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
             <b>D0 是新手模式：只有 2 个标的、4 个按钮。</b>
             {'\n\n'}
-            固定使用散户账户。先练习买入、做空和管理持仓，不启用 NPC、真假传闻、回购融资或监管处罚。
+            固定使用散户账户和历史时间线，事件日期不随种子漂移。先练习买入、做空和管理持仓，不启用 NPC、真假传闻、回购融资或监管处罚。
             {'\n\n'}
             买入、做空和平仓推进 1 个交易日；观望最多推进 5 日，遇到事件或风险提前暂停。
             {'\n\n'}

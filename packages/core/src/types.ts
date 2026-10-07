@@ -179,6 +179,8 @@ export interface InstitutionsFile {
 // ---------------------------------------------------------------- 市场
 
 export interface Bar {
+  /** D0 行情来源；estimated 表示数据集回填或无成交量的简化日线。 */
+  provenance?: 'historical' | 'estimated' | 'carried' | 'synthetic';
   date: DateStr;
   open: number;
   high: number;
@@ -248,6 +250,7 @@ export interface Account {
 export type OrderSide = 'buy' | 'sell';
 export type OrderKind = 'market' | 'limit';
 export type FillReason =
+  | 'missing_quote'
   | 'risk_close'
   | 'insufficient_funds'
   | 'ok'

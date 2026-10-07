@@ -195,6 +195,7 @@ export const BUTTON_TIPS = {
  */
 export const FILL_REASON: Record<string, string> = {
   ok: '成交',
+  missing_quote: '当日行情缺失，未成交；持仓暂用上一日估值',
   risk_close: '触及新手空头风险底线，自动平仓',
   partial: '部分成交',
   insufficient_liquidity: '流动性不足，未能成交',
@@ -238,6 +239,7 @@ export function buildHints(engine: GameEngine): Hint[] {
   }
 
   if (d === 0) {
+    if (p.marginCall) return [{ level: 'danger', text: '空头已触及风险底线，但行情缺失，暂时无法自动回补。恢复报价后会重新结算。' }];
     if (p.maintenanceMargin > 0) {
       hints.push({
         level: p.equity < p.maintenanceMargin * 1.5 ? 'warn' : 'info',

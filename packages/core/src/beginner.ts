@@ -21,12 +21,14 @@ export function beginnerMaintenance(account: Account, prices: Map<string, number
  */
 export function settleBeginnerRisk(
   account: Account, prices: Map<string, number>, date: string, commissionRate: number,
+  unavailable: ReadonlySet<string> = new Set(),
 ): Fill[] {
   const required = beginnerMaintenance(account, prices);
   const fills: Fill[] = [];
   if (required > 0 && account.equity + 1e-6 < required) {
     for (const pos of [...account.positions.values()]) {
       if (pos.quantity >= 0) continue;
+      if (unavailable.has(pos.instrumentId)) continue;
       const price = prices.get(pos.instrumentId) ?? pos.avgPrice;
       const quantity = -pos.quantity;
       const fill: Fill = {
@@ -40,7 +42,7 @@ export function settleBeginnerRisk(
     markToMarket(account, prices);
   }
   account.maintenanceMargin = beginnerMaintenance(account, prices);
-  account.marginCall = false;
+  account.marginCall = account.maintenanceMargin > 0 && account.equity + 1e-6 < account.maintenanceMargin;
   account.marginCallSince = undefined;
   return fills;
 }
