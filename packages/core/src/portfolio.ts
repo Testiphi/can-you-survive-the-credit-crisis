@@ -94,9 +94,10 @@ export function markToMarket(account: Account, prices: Map<string, number>): voi
   }
   account.equity = account.cash + positionsValue;
 
-  if (account.equity > account.peakEquity) account.peakEquity = account.equity;
+  const performanceEquity = account.equity + (account.distributedCapital ?? 0);
+  if (performanceEquity > account.peakEquity) account.peakEquity = performanceEquity;
   if (account.peakEquity > 0) {
-    const dd = 1 - account.equity / account.peakEquity;
+    const dd = 1 - performanceEquity / account.peakEquity;
     if (dd > account.maxDrawdown) account.maxDrawdown = dd;
   }
   if (account.equity <= 0) account.bankrupt = true;

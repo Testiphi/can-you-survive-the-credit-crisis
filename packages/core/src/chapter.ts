@@ -1,4 +1,4 @@
-import type { GameConfig, TurnReport } from './types.ts';
+import type { FundState, GameConfig, TurnReport } from './types.ts';
 
 export const BEGINNER_CHAPTER = {
   title: '危机高峰：守住本金',
@@ -28,18 +28,19 @@ export function isBeginnerChapter(config: GameConfig): boolean {
 }
 
 /** 用本局实际记录复盘，不用未来信息评判此前决策。 */
-export function reviewRun(config: GameConfig, equity: number, drawdown: number, bankrupt: boolean, reports: readonly TurnReport[]) {
+export function reviewRun(config: GameConfig, equity: number, drawdown: number, bankrupt: boolean, reports: readonly TurnReport[], fund?: FundState) {
   const period = beginnerPeriod(config) ?? BEGINNER_CHAPTER;
+  const distributedCapital = reports.reduce((sum, r) => sum + (r.capitalOutflow ?? 0), 0);
   const commissions = reports.reduce((sum, r) => sum + r.commission, 0);
   const borrowFees = reports.reduce((sum, r) => sum + r.borrowFees, 0);
   const riskCloses = reports.filter(r => r.fills.some(f => f.reason === 'risk_close')).length;
   const worstDay = reports.reduce<TurnReport | undefined>((worst, r) =>
-    !worst || r.equityAfter - r.equityBefore < worst.equityAfter - worst.equityBefore ? r : worst, undefined);
+    !worst || r.equityAfter - r.equityBefore + (r.capitalOutflow ?? 0) < worst.equityAfter - worst.equityBefore + (worst.capitalOutflow ?? 0) ? r : worst, undefined);
   return {
-    survived: !bankrupt,
-    capitalPreserved: equity + 1e-6 >= config.initialCapital * period.capitalFloor,
+    survived: !bankrupt && !fund?.defaulted,
+    capitalPreserved: equity + distributedCapital + 1e-6 >= config.initialCapital * period.capitalFloor,
     drawdownControlled: drawdown <= period.drawdownLimit + 1e-10,
     noForcedClose: riskCloses === 0,
-    commissions, borrowFees, riskCloses, worstDay,
+    commissions, borrowFees, riskCloses, worstDay, distributedCapital,
   };
 }

@@ -9,6 +9,7 @@
 
 import { BEGINNER_RULES, limitBeginnerFill, settleBeginnerRisk } from './beginner.ts';
 import { fingerprint, SAVE_VERSION, validateSave, type GameSave } from './save.ts';
+import { createFund, settleFund } from './fund.ts';
 import type {
   Account,
   Bar,
@@ -149,7 +150,8 @@ export class GameEngine {
     this.opts = options;
 
     const difficulty = options.config?.difficulty ?? DEFAULT_CONFIG.difficulty;
-    const identity = difficulty === 0 ? 'retail' : options.config?.identity ?? DEFAULT_CONFIG.identity;
+    const requestedIdentity = options.config?.identity ?? DEFAULT_CONFIG.identity;
+    const identity = difficulty === 0 && requestedIdentity !== 'hedge_fund' ? 'retail' : requestedIdentity;
     const profile = IDENTITY_PROFILE[identity];
     this.config = {
       ...DEFAULT_CONFIG,
@@ -237,6 +239,7 @@ export class GameEngine {
     this.haircutRatchet = startMacro.repoHaircut;
 
     this.state = {
+      ...(difficulty === 0 && identity === 'hedge_fund' ? { fund: createFund(this.config) } : {}),
       config: this.config,
       date: this.config.startDate,
       turnIndex: 0,
@@ -276,7 +279,7 @@ export class GameEngine {
   }
 
   get isOver(): boolean {
-    return this.state.date >= this.config.endDate || this.state.player.bankrupt;
+    return this.state.date >= this.config.endDate || this.state.player.bankrupt || this.state.fund?.defaulted === true;
   }
 
   /** 剩余交易日数 */
@@ -579,6 +582,10 @@ export class GameEngine {
       this.settleMargin(newBars, nextDate, fills);
     }
 
+    // 教学基金的赎回是外部资本流出，在当天交易、费用和风险处理后兑付。
+    const redemption = this.state.fund ? settleFund(this.state.fund, this.state.player, this.state.prices, nextDate) : undefined;
+    if (redemption) newNews.push(...redemption.news);
+
     // ---- 11) 监管 ----
     if (this.config.difficulty > 0) this.stepRegulator(base);
 
@@ -608,7 +615,8 @@ export class GameEngine {
     const commission = fills.reduce((sum, fill) => sum + fill.commission, 0);
     this.reports.push({
       date: nextDate, equityBefore, equityAfter: this.state.player.equity,
-      marketPnl: this.state.player.equity - equityBefore + commission + borrowFees,
+      marketPnl: this.state.player.equity - equityBefore + commission + borrowFees + (redemption?.capitalOutflow ?? 0),
+      ...(redemption ? { capitalOutflow: redemption.capitalOutflow } : {}),
       commission, borrowFees, fills: structuredClone(fills), firedEventIds: [...firedEventIds],
     });
 

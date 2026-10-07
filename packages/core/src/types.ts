@@ -229,6 +229,8 @@ export interface Position {
 }
 
 export interface Account {
+  /** 教学基金已返还投资者的资本，供收益和回撤剔除外部现金流。 */
+  distributedCapital?: Money;
   cash: Money;
   positions: Map<string, Position>;
   equity: Money;
@@ -354,6 +356,7 @@ export interface ScoreSnapshot {
 }
 
 export interface GameState {
+  fund?: FundState;
   config: GameConfig;
   date: DateStr;
   turnIndex: number;
@@ -386,6 +389,7 @@ export interface TurnResult {
 }
 
 export interface TurnReport {
+  capitalOutflow?: Money;
   date: DateStr;
   equityBefore: Money;
   equityAfter: Money;
@@ -395,6 +399,11 @@ export interface TurnReport {
   borrowFees: Money;
   fills: Fill[];
   firedEventIds: string[];
+}
+
+export interface FundState {
+  payments: Array<{ date: DateStr; amount: Money; status: 'pending' | 'paid' | 'missed' }>;
+  defaulted: boolean;
 }
 
 // ---------------------------------------------------------------- 真实历史数据

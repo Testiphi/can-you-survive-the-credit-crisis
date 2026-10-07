@@ -291,10 +291,10 @@ export function App() {
             <span>
               <Tip text={BUTTON_TIPS.identity}>身份 ⓘ</Tip>
             </span>
-            <select value={difficulty === 0 ? 'retail' : identity} disabled={difficulty === 0} onChange={(e) => setIdentity(e.target.value as Identity)}>
-              {(Object.keys(IDENTITY_LABEL) as Identity[]).map((k) => (
+            <select value={difficulty === 0 && identity !== 'hedge_fund' ? 'retail' : identity} onChange={(e) => setIdentity(e.target.value as Identity)}>
+              {(Object.keys(IDENTITY_LABEL) as Identity[]).filter(k => difficulty !== 0 || k === 'retail' || k === 'hedge_fund').map((k) => (
                 <option key={k} value={k}>
-                  {IDENTITY_LABEL[k]}
+                  {difficulty === 0 && k === 'hedge_fund' ? '基金经理（教学版，$1000 万）' : IDENTITY_LABEL[k]}
                 </option>
               ))}
             </select>
@@ -352,10 +352,11 @@ export function App() {
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
             <b>D0 是新手模式：只有 2 个标的、4 个按钮。</b>
             {'\n\n'}
-            固定使用散户账户和历史时间线，事件日期不随种子漂移。先练习买入、做空和管理持仓，不启用 NPC、真假传闻、回购融资或监管处罚。
+            使用历史时间线，事件日期不随种子漂移。散户练习买入、做空和管理持仓；基金经理还须按时兑付投资者赎回。不启用 NPC、真假传闻、回购融资或监管处罚。
             {'\n\n'}
             买入、做空和平仓推进 1 个交易日；观望最多推进 5 日，遇到事件或风险提前暂停。
             {'\n\n'}
+            基金经理在开局后的第 10、25 个交易日收盘，各兑付初始资金的 10%。到期前会暂停快进；兑付资金不计作投资亏损。
             保留适合新手的历史事件新闻。做空按固定费率收费，触及明确的风险底线时自动回补；具体规则可在账户面板查看。
           </div>
         )}

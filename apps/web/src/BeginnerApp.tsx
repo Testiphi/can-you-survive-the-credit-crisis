@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { Fill, GameEngine } from '@cyscc/core';
-import { BEGINNER_RULES, beginnerPeriod, reviewRun } from '@cyscc/core';
+import { BEGINNER_RULES, beginnerPeriod, reviewRun, fundAvailableCash } from '@cyscc/core';
 
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
@@ -72,7 +72,10 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
 
   const s = engine.summary();
   const chapter = beginnerPeriod(engine.config);
-  const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports);
+  const fund = engine.state.fund;
+  const distributed = engine.state.player.distributedCapital ?? 0;
+  const roleName = fund ? '基金经理（教学版）' : '散户';
+  const review = reviewRun(engine.config, s.equity, s.maxDrawdown, s.bankrupt, engine.turnReports, fund);
   const lastReport = engine.turnReports.at(-1);
   const inst = D0_INSTRUMENTS.find((i) => i.id === selected) ?? D0_INSTRUMENTS[0];
   const bars = useMemo(
@@ -81,22 +84,23 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
     [engine, selected, engine.state.turnIndex],
   );
 
-  const ret = s.equity / engine.config.initialCapital - 1;
+  const ret = (s.equity + distributed) / engine.config.initialCapital - 1;
 
   /** 交易只推进一天；观望有明确上限和风险暂停。 */
   const advanceSession = useCallback(
     (log: Fill[], days: number) => {
       const e = engineRef.current;
       let advanced = 0;
-      const startingEquity = e.state.player.equity;
+      const startingEquity = e.state.player.equity + (e.state.player.distributedCapital ?? 0);
       let reason = '已到达本次推进上限';
       for (let i = 0; i < days; i++) {
         if (e.isOver) break;
         const res = e.advance();
         advanced++;
         if (res.fills.length > 0) log.push(...res.fills);
-        if (e.isOver || res.marginCall || res.fills.length > 0 || res.firedEventIds.length > 0 || res.equity <= startingEquity * 0.97) {
-          reason = e.isOver ? '本局结束' : res.marginCall ? '需要处理账户风险' : res.fills.length > 0 ? '请查看成交结果' : res.firedEventIds.length > 0 ? '出现新事件' : '期间净值下跌达到 3%';
+        const fundNotice = res.news.some(n => n.id.startsWith('fund-'));
+        if (e.isOver || fundNotice || res.marginCall || res.fills.length > 0 || res.firedEventIds.length > 0 || res.equity + (e.state.player.distributedCapital ?? 0) <= startingEquity * 0.97) {
+          reason = e.isOver ? '本局结束' : fundNotice ? '请查看投资者赎回安排' : res.marginCall ? '需要处理账户风险' : res.fills.length > 0 ? '请查看成交结果' : res.firedEventIds.length > 0 ? '出现新事件' : '期间净值下跌达到 3%';
           break;
         }
       }
@@ -160,11 +164,11 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
           <span className="dim">第 {s.turnIndex} 个交易日</span>
         </div>
         <div className="b-equity">
-          <span className="k">总资产</span>
+          <span className="k">{roleName} · 账户净资产</span>
           <span className="v">{money(s.equity)}</span>
           <span className={`d ${ret >= 0 ? 'pos' : 'neg'}`}>
             {ret >= 0 ? '+' : ''}
-            {pct(ret)}
+            {pct(ret)}{fund ? '（已加回兑付）' : ''}
           </span>
         </div>
         <button className="ghost" onClick={onRestart} {...restartTip}>
@@ -176,8 +180,14 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
       {chapter && <div className="banner info">
         <b>{chapter.title}</b> · {engine.config.startDate} 至 {engine.config.endDate} · 剩余 {engine.isOver ? 0 : engine.remainingTurns} 个交易日
         <p>{chapter.briefing}</p>
-        <p>目标：结束时保留至少 {money(engine.config.initialCapital * chapter.capitalFloor)} 净资产。
+        <p>目标：结束时保留至少 {money(engine.config.initialCapital * chapter.capitalFloor)} {fund ? '净资产与累计兑付之和，并完成全部到期兑付' : '净资产'}。
         风控挑战：最大回撤不超过 {pct(chapter.drawdownLimit)}，且不触发自动回补。保留现金同样可以完成目标。</p>
+      </div>}
+      {fund && <div className={`banner ${fund.defaulted ? 'danger' : 'info'}`}>
+        <b>投资者赎回安排</b> · 当前可兑付现金 {money(fundAvailableCash(engine.state.player, engine.state.prices))}
+        <p>每笔在标注日期收盘结算。请提前保留现金或提交减仓；卖空所得与等额担保资金不能用于兑付。未能按期支付即结束本局，即使账面净资产仍为正。</p>
+        {fund.payments.map(p => <div key={p.date}>{p.date} · {money(p.amount)} · {p.status === 'paid' ? '已兑付' : p.status === 'missed' ? '未兑付' : '待兑付'}</div>)}
+        <p>累计已返还 {money(distributed)}。收益和回撤使用“剩余净资产＋已返还资本”计算；账户资金可用量仍按实际余额判断。</p>
       </div>}
       <div className="b-body">
         {/* ---------------- 左：行情与操作 ---------------- */}
@@ -234,9 +244,10 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
             </div>
           ))}
 
-          {engine.isOver && !s.bankrupt && (
+          {engine.isOver && !s.bankrupt && !fund?.defaulted && (
             <div className="banner info">本局已到达 {engine.config.endDate}。查看右侧复盘了解资金变化。</div>
           )}
+          {fund?.defaulted && <div className="banner danger">未能按时兑付投资者赎回，本局结束。未支付金额没有从账户扣除。</div>}
           {s.bankrupt && (
             <div className="banner danger">
               <b>你的钱亏光了，这一局结束。</b> 让你出局的往往不是判断错了方向，
@@ -283,17 +294,18 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
             <div className="line">持仓与交易价差：{lastReport.marketPnl >= 0 ? '+' : ''}{exactMoney(lastReport.marketPnl)}</div>
             <div className="line">交易手续费：−{exactMoney(lastReport.commission)}</div>
             <div className="line">做空持有费：−{exactMoney(lastReport.borrowFees)}</div>
+            {lastReport.capitalOutflow !== undefined && <div className="line">投资者赎回（资本返还）：−{exactMoney(lastReport.capitalOutflow)}</div>}
             <div className="line">期末净资产：{exactMoney(lastReport.equityAfter)}</div>
           </div>}
           {engine.isOver && <div className="b-panel">
             <h3>本局复盘</h3>
-            <p>{s.bankrupt ? '账户已破产。' : '已完成本局。'} 净收益 {signed(s.equity - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
-            {chapter && <p>本金目标：{review.capitalPreserved && review.survived ? '完成' : '未完成'}；
+            <p>{s.bankrupt ? '账户已破产。' : fund?.defaulted ? '投资者赎回未能按期兑付。' : '已完成本局。'} 净收益 {signed(s.equity + distributed - engine.config.initialCapital)}，最大回撤 {pct(s.maxDrawdown)}。</p>
+            {chapter && <p>本金目标：{review.capitalPreserved && review.survived && !fund?.defaulted ? '完成' : '未完成'}；
               回撤挑战：{review.drawdownControlled ? '完成' : '未完成'}；
               避免自动回补：{review.noForcedClose ? '完成' : '未完成'}。</p>}
             <p>累计手续费 {money(review.commissions)}，做空持有费 {money(review.borrowFees)}，自动回补 {review.riskCloses} 次。</p>
-            {review.worstDay && review.worstDay.equityAfter < review.worstDay.equityBefore && <p>
-              最大单日净损失发生在 {review.worstDay.date}：{money(review.worstDay.equityBefore - review.worstDay.equityAfter)}。
+            {review.worstDay && review.worstDay.equityAfter + (review.worstDay.capitalOutflow ?? 0) < review.worstDay.equityBefore && <p>
+              最大单日净损失发生在 {review.worstDay.date}：{money(review.worstDay.equityBefore - review.worstDay.equityAfter - (review.worstDay.capitalOutflow ?? 0))}。
               当日持仓与交易价差 {signed(review.worstDay.marketPnl)}，费用合计 {money(review.worstDay.commission + review.worstDay.borrowFees)}。
               {review.worstDay.fills.some(f => f.reason === 'risk_close') ? '当日触及空头风险底线并自动回补。' : ''}
             </p>}
@@ -315,7 +327,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote }: Props)
             </h3>
 
             <p className="desc">
-              D0 散户教学规则：不启用 NPC、传闻、回购融资和监管处罚。
+              D0 {roleName}规则：不启用 NPC、传闻、回购融资和监管处罚。
               做空按空头市值收取年化 {pct(BEGINNER_RULES.borrowFeeRate)} 的费用，每交易日按年费的 1/252 计提。
               收盘净资产低于空头市值的 {pct(BEGINNER_RULES.shortMaintenanceRate)} 时，按收盘价自动买回全部空头，另收正常手续费。
               跳空仍可能导致损失超过本金。
