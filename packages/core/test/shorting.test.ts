@@ -51,7 +51,7 @@ test('做空指数不创造权益', () => {
 
 test('有流通股的个股仍然受券源约束', () => {
   // 指数放开了借券约束，但个股不能一起放开——券源上限是做空摩擦的来源之一。
-  const e = makeEngine();
+  const e = new GameEngine(dataset, { config: { difficulty: 1, identity: 'retail' } });
   const float = INSTRUMENT_BY_ID.get('C')!.sharesOutstanding;
   assert.ok(float > 0, '花旗应有流通股');
 
@@ -64,7 +64,7 @@ test('有流通股的个股仍然受券源约束', () => {
 });
 
 test('卖空超过券源上限时会被截断，而不是静默失败', () => {
-  const e = makeEngine();
+  const e = new GameEngine(dataset, { config: { difficulty: 1, identity: 'retail' } });
   const inst = INSTRUMENT_BY_ID.get('C')!;
   // 用远超券源的数量下单
   const huge = Math.floor(inst.sharesOutstanding * 0.5);
@@ -99,7 +99,7 @@ test('相对市场极小的订单应完全成交（回归：买入 70 股只成�
 test('危机中的大额订单仍会被流动性截断', () => {
   // 上面放开的是「极小订单」，大额订单在低流动性下必须仍然难以成交——
   // 那是「想跑却跑不掉」这个核心体感的来源。
-  const e = makeEngine();
+  const e = new GameEngine(dataset, { config: { difficulty: 1, identity: 'retail' } });
   const px = e.state.prices.get('SPX')!;
   // 造一个相对 capacity 有分量的订单：直接下单量取 ADV 的一大部分
   const adv = 5e10;

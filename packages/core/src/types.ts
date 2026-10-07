@@ -248,6 +248,8 @@ export interface Account {
 export type OrderSide = 'buy' | 'sell';
 export type OrderKind = 'market' | 'limit';
 export type FillReason =
+  | 'risk_close'
+  | 'insufficient_funds'
   | 'ok'
   | 'partial'
   | 'insufficient_liquidity'

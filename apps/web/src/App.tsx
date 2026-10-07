@@ -270,7 +270,7 @@ export function App() {
             <span>
               <Tip text={BUTTON_TIPS.identity}>身份 ⓘ</Tip>
             </span>
-            <select value={identity} onChange={(e) => setIdentity(e.target.value as Identity)}>
+            <select value={difficulty === 0 ? 'retail' : identity} disabled={difficulty === 0} onChange={(e) => setIdentity(e.target.value as Identity)}>
               {(Object.keys(IDENTITY_LABEL) as Identity[]).map((k) => (
                 <option key={k} value={k}>
                   {IDENTITY_LABEL[k]}
@@ -305,14 +305,11 @@ export function App() {
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
             <b>D0 是新手模式：只有 2 个标的、4 个按钮。</b>
             {'\n\n'}
-            你看不到 K 线、成交量、均线，也看不到任何宏观指标——不是藏起来，是
-            **那些东西在你还不熟悉这个游戏之前只会碍事**。
+            固定使用散户账户。先练习买入、做空和管理持仓，不启用 NPC、真假传闻、回购融资或监管处罚。
             {'\n\n'}
-            你只需要：看新闻 → 在「买入 / 做空 / 观望 / 赎回」里选一个 →
-            时间自动前进到下一条新闻。**你永远不需要想「我该什么时候点推进」。**
+            买入、做空和平仓推进 1 个交易日；观望最多推进 5 日，遇到事件或风险提前暂停。
             {'\n\n'}
-            新闻一条都没有削减——那是这个游戏的全部意义。想看清全局数据时，
-            换 D1 或更高。
+            保留适合新手的历史事件新闻。做空按固定费率收费，触及明确的风险底线时自动回补；具体规则可在账户面板查看。
           </div>
         )}
         {difficulty !== 0 && (

@@ -195,8 +195,10 @@ export const BUTTON_TIPS = {
  */
 export const FILL_REASON: Record<string, string> = {
   ok: '成交',
+  risk_close: '触及新手空头风险底线，自动平仓',
   partial: '部分成交',
   insufficient_liquidity: '流动性不足，未能成交',
+  insufficient_funds: '可用资金或新手持仓额度不足，未能成交',
   not_shortable: '借不到券，无法做空',
   margin_rejected: '保证金不足，被拒绝',
   no_position: '没有可平仓的持仓',
@@ -233,6 +235,18 @@ export function buildHints(engine: GameEngine): Hint[] {
           '回头看看：让你出局的往往不是判断错了方向，而是**在正确的方向上没能活到明天**。',
       },
     ];
+  }
+
+  if (d === 0) {
+    if (p.maintenanceMargin > 0) {
+      hints.push({
+        level: p.equity < p.maintenanceMargin * 1.5 ? 'warn' : 'info',
+        text: `持有空头会每天扣费。当前自动回补底线为净资产 $${Math.round(p.maintenanceMargin).toLocaleString('en-US')}，它随空头市值变化；你可以提前平仓。`,
+      });
+    } else {
+      hints.push({ level: 'info', text: '买卖后先查看次日成交结果；观望最多推进五个交易日。保留现金也是一种选择。' });
+    }
+    return hints;
   }
 
   if (p.marginCall) {

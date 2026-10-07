@@ -7,6 +7,7 @@
  * 铁律：玩家在 t 日看到的只有 ≤ t 日的信息，成交发生在 t+1。
  */
 
+import { BEGINNER_RULES, limitBeginnerFill, settleBeginnerRisk } from './beginner.ts';
 import type {
   Account,
   Bar,
@@ -139,11 +140,13 @@ export class GameEngine {
     this.dataset = dataset;
     this.opts = options;
 
-    const identity = options.config?.identity ?? DEFAULT_CONFIG.identity;
+    const difficulty = options.config?.difficulty ?? DEFAULT_CONFIG.difficulty;
+    const identity = difficulty === 0 ? 'retail' : options.config?.identity ?? DEFAULT_CONFIG.identity;
     const profile = IDENTITY_PROFILE[identity];
     this.config = {
       ...DEFAULT_CONFIG,
       ...options.config,
+      identity,
       initialCapital: options.config?.initialCapital ?? profile.capital,
     };
 
@@ -229,7 +232,7 @@ export class GameEngine {
       prices,
       macro: { ...startMacro },
       player: account,
-      agents: options.disableAgents ? [] : createAgents(this.streams.agents),
+      agents: this.config.difficulty === 0 || options.disableAgents ? [] : createAgents(this.streams.agents),
       regulator: createRegulatorState(),
       institutions: initInstitutionStates(dataset.institutions),
       firedEvents: [],
@@ -503,21 +506,37 @@ export class GameEngine {
     //   ① 借券费随利用率二次上升，且危机中放大
     //   ② 可借券规模有上限，危机中收缩
     //   ③ 出借人可以召回 → 强制回补 → 在反弹中被逼空
-    this.settleSecuritiesLending(nextDate, fills, spxReturn);
+    if (this.config.difficulty === 0) {
+      for (const pos of this.state.player.positions.values()) {
+        pos.borrowFeeRate = pos.quantity < 0 ? BEGINNER_RULES.borrowFeeRate : 0;
+      }
+    } else {
+      this.settleSecuritiesLending(nextDate, fills, spxReturn);
+    }
     accrueBorrowFees(this.state.player, this.state.prices);
     markToMarket(this.state.player, this.state.prices);
 
     // ---- 9) 回购融资与被迫卖出 ----
-    this.settleRepo(newBars, nextDate, fills);
+    if (this.config.difficulty > 0) this.settleRepo(newBars, nextDate, fills);
 
     // ---- 10) 保证金检查与强平 ----
-    this.settleMargin(newBars, nextDate, fills);
+    if (this.config.difficulty === 0) {
+      const riskFills = settleBeginnerRisk(this.state.player, this.state.prices, nextDate, COMMISSION_RATE);
+      fills.push(...riskFills);
+      if (riskFills.length > 0) newNews.push({
+        id: `risk-close-${nextDate}`, date: nextDate, source: 'system', credibility: 1, isTrue: true,
+        headline: '空头风险底线触发，已自动平仓',
+        body: '收盘净资产低于空头市值的 30%，系统按本日收盘价买回全部空头，并收取正常手续费。没有额外惩罚滑点；跳空仍可能使损失超过本金。',
+      });
+    } else {
+      this.settleMargin(newBars, nextDate, fills);
+    }
 
     // ---- 11) 监管 ----
-    this.stepRegulator(base);
+    if (this.config.difficulty > 0) this.stepRegulator(base);
 
     // ---- 12) 新闻与传闻 ----
-    this.stepRumors(newNews, ctx);
+    if (this.config.difficulty > 0) this.stepRumors(newNews, ctx);
 
     // ---- 13) 记分快照 ----
     const snap: ScoreSnapshot = {
@@ -659,7 +678,7 @@ export class GameEngine {
     }
 
     // 监管规则注入
-    if (card.imposesRule) {
+    if (this.config.difficulty > 0 && card.imposesRule) {
       addRule(this.state.regulator, {
         kind: card.imposesRule.kind,
         scope: card.imposesRule.scope,
@@ -671,9 +690,11 @@ export class GameEngine {
 
     // 新闻（仅难度允许时对玩家展示，但事件本身总会发生）
     if (this.scenario.visibilityOk(card)) {
-      newsOut.push(
-        newsFromEvent(card, this.state.date, difficulty, this.streams.news, DIFFICULTY_PROFILE[difficulty].newsNoise),
-      );
+      const news = newsFromEvent(card, this.state.date, difficulty, this.streams.news, DIFFICULTY_PROFILE[difficulty].newsNoise);
+      if (difficulty === 0 && card.imposesRule) {
+        news.body += '\n\n新手模式说明：这条新闻介绍历史政策，D0 不对你的账户执行禁空、额外追保或监管处罚。';
+      }
+      newsOut.push(news);
     }
   }
 
@@ -737,7 +758,7 @@ export class GameEngine {
   private executePending(newBars: Map<string, Bar>, date: string): Fill[] {
     const diff = DIFFICULTY_PROFILE[this.config.difficulty];
     const fills: Fill[] = [];
-    const bannedSectors = bannedShortScope(this.state.regulator);
+    const bannedSectors = this.config.difficulty === 0 ? new Set<string>() : bannedShortScope(this.state.regulator);
     const shortBanned = new Set<string>();
     for (const inst of INSTRUMENTS) {
       if (inst.sector === 'index') continue;
@@ -761,7 +782,7 @@ export class GameEngine {
       // 这个游戏最核心的操作（最优策略就是先空后多）。
       const currentQty = positionQty(this.state.player, order.instrumentId);
       let maxShortQty: number | undefined;
-      if (order.side === 'sell' && inst.sharesOutstanding > 0) {
+      if (this.config.difficulty > 0 && order.side === 'sell' && inst.sharesOutstanding > 0) {
         const quote = borrowQuote({
           instrumentId: order.instrumentId,
           floatShares: inst.sharesOutstanding,
@@ -772,7 +793,7 @@ export class GameEngine {
         maxShortQty = quote.capacityShares;
       }
 
-      const fill = executeOrder({
+      let fill = executeOrder({
         order,
         openPrice: bar.open,
         adv20: bar.adv20,
@@ -790,6 +811,11 @@ export class GameEngine {
         },
       });
 
+      if (this.config.difficulty === 0) {
+        const openingPrices = new Map([...newBars].map(([id, bar]) => [id, bar.open]));
+        fill = limitBeginnerFill(this.state.player, openingPrices, fill);
+      }
+      fill.filledAt = date;
       if (fill.quantity > 0) {
         fill.filledAt = date;
         applyFill(this.state.player, fill, date);

@@ -1,34 +1,9 @@
-/**
- * D0 新手模式。
- *
- * ## 为什么单独做一个界面，而不是给主界面加 if
- *
- * 主界面是为「看懂危机」设计的：20 个标的、K 线 + 成交量 + 均线、
- * 回购折扣率、系统性风险分、机构脆弱度表……这些对已经入门的玩家是好东西，
- * 对第一次接触的人是一堵墙。
- *
- * 所以 D0 不是「主界面少显示几项」，而是**换一套交互模型**：
- *
- * | | D1+ 主界面 | D0 新手模式 |
- * |---|---|---|
- * | 标的 | 20 个（指数 + 机构 + 合成标的） | **2 个**，带一句话说明 |
- * | 图表 | 蜡烛 + 成交量 + MA20/MA60 | **一条价格线** + 起始基准 |
- * | 操作 | 做多/做空 25% 与 100%、清仓 | **买入 / 做空 / 观望 / 赎回** |
- * | 节奏 | 自己决定推进多少天 | **每个操作自动推进到下一条新闻** |
- * | 账户 | 权益、融资容量、展期率、SRS | **模拟盘**：现金 / 持仓 / 浮动盈亏 / 成交记录 |
- *
- * 唯一没有削减的是**新闻**——那是这个游戏的全部意义所在。
- *
- * ## 交互模型：一个动作 = 一条新闻
- *
- * 新手最容易卡住的地方是「我该什么时候点推进」。这里的答案是：
- * 你不需要想这件事。看新闻 → 做决定 → 点一个按钮 → 时间前进到下一条新闻。
- * 「观望」就是「这条新闻我不操作」，它不是什么都不做的死按钮。
- */
+/** D0: trades advance one day; waiting advances at most five trading days with risk stops. */
 
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { Fill, GameEngine } from '@cyscc/core';
+import { BEGINNER_RULES } from '@cyscc/core';
 
 import { SimpleChart } from './SimpleChart.tsx';
 import { Tip, useTip } from './Tip.tsx';
@@ -51,16 +26,16 @@ const D0_INSTRUMENTS: Array<{ id: string; name: string; hint: string; desc: stri
 ];
 
 const ACTIONS = {
-  buy: '买入\n\n用你手上全部的现金买入，变成持仓。\n\n价格涨了你赚钱，跌了你亏钱。最坏情况是亏光本金，不会更多。',
+  buy: '买入\n\n按现金提交买入；实际成交会预留手续费，并受新手持仓额度限制。\n\n价格涨了你赚钱，跌了你亏钱。最坏情况是亏光本金，不会更多。',
   short:
     '做空\n\n先借来卖出，等价格跌了再买回来还掉，赚差价。\n\n' +
     '价格跌你赚钱；**价格涨你亏钱，而且亏损没有上限**——因为股价理论上可以无限涨。\n\n' +
     '这是本作风险最高的动作。历史上靠做空危机发财的人确实存在，但他们也是在崩盘之前就下注的。',
   wait:
-    '观望\n\n这条新闻我不操作，直接看下一条。\n\n' +
-    '**观望不是错误的决定。** 危机里空仓也是一种仓位——只是它只能拿到中等成绩。',
+    '观望\n\n最多观望 5 个交易日；遇到事件、成交、追保或期间净值下跌 3% 时提前暂停。\n\n' +
+    '**观望不是错误的决定。** 危机里可以保留现金，等待更清楚的信号。',
   redeem:
-    '赎回\n\n把手上所有持仓全部卖掉，换回现金。\n\n' +
+    '平仓\n\n卖出多头、买回空头，退出持仓。\n\n' +
     '行情不好的时候，可能只能卖掉一部分——想跑却跑不掉，这是 2008 年的真实体感。',
 } as const;
 
@@ -81,6 +56,7 @@ interface Props {
 export function BeginnerApp({ engine, onChange, onRestart }: Props) {
   const [selected, setSelected] = useState('SPX');
   const [trades, setTrades] = useState<Fill[]>([]);
+  const [stepNote, setStepNote] = useState('');
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const engineRef = useRef(engine);
   engineRef.current = engine;
@@ -101,19 +77,25 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
 
   const ret = s.equity / engine.config.initialCapital - 1;
 
-  /** 推进到下一条新闻（带安全上限）。 */
-  const advanceToNews = useCallback(
-    (log: Fill[]) => {
+  /** 交易只推进一天；观望有明确上限和风险暂停。 */
+  const advanceSession = useCallback(
+    (log: Fill[], days: number) => {
       const e = engineRef.current;
       let advanced = 0;
-      for (let i = 0; i < 120; i++) {
+      const startingEquity = e.state.player.equity;
+      let reason = '已到达本次推进上限';
+      for (let i = 0; i < days; i++) {
         if (e.isOver) break;
         const res = e.advance();
         advanced++;
         if (res.fills.length > 0) log.push(...res.fills);
-        if (res.firedEventIds.length > 0) break;
+        if (e.isOver || res.marginCall || res.fills.length > 0 || res.firedEventIds.length > 0 || res.equity <= startingEquity * 0.97) {
+          reason = e.isOver ? '本局结束' : res.marginCall ? '需要处理账户风险' : res.fills.length > 0 ? '请查看成交结果' : res.firedEventIds.length > 0 ? '出现新事件' : '期间净值下跌达到 3%';
+          break;
+        }
       }
       if (log.length > 0) setTrades((prev) => [...prev, ...log].slice(-6));
+      setStepNote(`推进 ${advanced} 个交易日：${reason}。`);
       onChange();
       return advanced;
     },
@@ -127,7 +109,7 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
       const log: Fill[] = [];
 
       if (kind === 'buy') {
-        // 用可用现金全仓买入——新手模式不引入融资，所以不会买超
+        // 按现金提交，开盘时由引擎按实际价格与账户额度裁剪。
         const cash = Math.max(0, e.state.player.cash);
         if (cash >= 1) e.submitByNotional(selected, cash);
       } else if (kind === 'short') {
@@ -146,10 +128,10 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
       }
       // wait：什么都不做，直接推进
 
-      advanceToNews(log);
+      advanceSession(log, kind === 'wait' ? 5 : 1);
       bump();
     },
-    [selected, advanceToNews],
+    [selected, advanceSession],
   );
 
   const hints = buildHints(engine).slice(0, 2);
@@ -245,6 +227,7 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
             </div>
           )}
 
+          {stepNote && <div className="banner info" role="status">{stepNote}</div>}
           <div className="b-actions">
             <button className="big buy" onClick={() => act('buy')} disabled={engine.isOver} {...buyTip}>
               买入
@@ -261,11 +244,11 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
               disabled={engine.isOver || held.length === 0}
               {...redeemTip}
             >
-              赎回
+              平仓
             </button>
           </div>
           <div className="b-actions-note">
-            每个按钮都会推进到下一条新闻 —— 你不需要考虑「该什么时候前进」。
+            买卖与平仓推进 1 个交易日；观望最多推进 5 日，遇到事件或风险提前暂停。新增仓位须满足持仓总额不超过账户权益。
           </div>
         </div>
 
@@ -276,28 +259,41 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
               <Tip
                 text={
                   '模拟盘\n\n' +
-                  '这是一个虚拟账户，起始资金 10 万美元，和真实交易无关。\n\n' +
+                  `这是一个虚拟账户，起始资金 ${money(engine.config.initialCapital)}，和真实交易无关。\n\n` +
                   '「买入」用你的现金换持仓；「做空」是借来先卖、跌了再买回；' +
-                  '「赎回」把持仓换回现金。'
+                  '「平仓」把持仓换回现金。'
                 }
               >
                 我的模拟盘 ⓘ
               </Tip>
             </h3>
 
+            <p className="desc">
+              D0 散户教学规则：不启用 NPC、传闻、回购融资和监管处罚。
+              做空按空头市值收取年化 {pct(BEGINNER_RULES.borrowFeeRate)} 的费用，每交易日按年费的 1/252 计提。
+              收盘净资产低于空头市值的 {pct(BEGINNER_RULES.shortMaintenanceRate)} 时，按收盘价自动买回全部空头，另收正常手续费。
+              跳空仍可能导致损失超过本金。
+            </p>
+
             <div className="b-acct">
               <div className="line">
-                <span>可用现金</span>
+                <span>账户现金（含卖空所得）</span>
                 <b>{money(s.cash)}</b>
               </div>
               <div className="line">
-                <span>持仓市值</span>
+                <span>持仓总额（多空绝对值）</span>
                 <b>{money(marketValue)}</b>
               </div>
               <div className="line total">
                 <span>总资产</span>
                 <b>{money(s.equity)}</b>
               </div>
+              {s.positions.some((p) => p.qty < 0) && (
+                <div className="line">
+                  <span>空头风险底线（净资产）</span>
+                  <b>{money(engine.state.player.maintenanceMargin)}</b>
+                </div>
+              )}
               {held.length > 0 && (
                 <div className="line">
                   <span>浮动盈亏</span>
@@ -370,7 +366,7 @@ export function BeginnerApp({ engine, onChange, onRestart }: Props) {
                           <span>
                             {nm} {f.quantity} 股
                           </span>
-                          <span className="dim">@{f.price.toFixed(2)}</span>
+                          <span className="dim">@{f.price.toFixed(2)}{f.reason !== 'ok' ? ` · ${FILL_REASON[f.reason] ?? f.reason}` : ''}</span>
                         </>
                       )}
                     </div>
