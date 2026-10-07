@@ -1,5 +1,5 @@
 import type { Account, Fill } from './types.ts';
-import { applyFill, markToMarket } from './portfolio.ts';
+import { applyFill, markToMarket, loanLiabilities } from './portfolio.ts';
 
 /** 教学规则，不随事件、评级或市场压力改变。 */
 export const BEGINNER_RULES = {
@@ -51,14 +51,14 @@ export function settleBeginnerRisk(
  * Prices are opening quotes, never the day's not-yet-observed closing prices.
  * Called after each execution so queued orders share the same buying power.
  */
-export function limitBeginnerFill(account: Account, prices: Map<string, number>, fill: Fill): Fill {
+export function limitBeginnerFill(account: Account, prices: Map<string, number>, fill: Fill, exposureLimit = 1): Fill {
   if (fill.quantity <= 0) return fill;
   const id = fill.order.instrumentId;
   const current = account.positions.get(id)?.quantity ?? 0;
   const sign = fill.order.side === 'buy' ? 1 : -1;
   const price = fill.price;
   const feePerShare = fill.commission / fill.quantity;
-  let equity = account.cash;
+  let equity = account.cash - loanLiabilities(account);
   let otherExposure = 0;
   for (const pos of account.positions.values()) {
     const p = prices.get(pos.instrumentId) ?? pos.avgPrice;
@@ -72,7 +72,7 @@ export function limitBeginnerFill(account: Account, prices: Map<string, number>,
     const q = Math.ceil((lo + hi) / 2);
     const cash = account.cash - sign * q * price - q * feePerShare;
     const exposure = otherExposure + Math.abs(current + sign * q) * price;
-    if (cash >= 0 && exposure <= equity - q * feePerShare) lo = q;
+    if (cash >= 0 && exposure <= exposureLimit * (equity - q * feePerShare)) lo = q;
     else hi = q - 1;
   }
   if (lo === fill.quantity) return fill;

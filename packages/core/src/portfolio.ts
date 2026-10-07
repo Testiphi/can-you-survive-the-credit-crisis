@@ -1,7 +1,7 @@
 /**
  * 账户、保证金与强平。
  *
- * 会计恒等式：equity = cash + Σ (qty × price)
+ * 会计恒等式：equity = cash + Σ (qty × price) − 未偿借款本金与应计利息
  * 做空不会创造权益：卖空 100 股 @10 → cash +1000，持仓 -100，equity 不变。
  */
 
@@ -13,6 +13,10 @@ export const DEFAULT_MARGIN_RATE = 0.25;
 export const SHORT_MARGIN_RATE = 0.3;
 /** 清算容差，避免浮点误差导致「差一分钱被强平」（见 docs/02 §9.3） */
 export const MARGIN_EPSILON = 1e-6;
+
+export function loanLiabilities(account: Account): Money {
+  return (account.loans ?? []).reduce((sum, loan) => sum + loan.principal + loan.accruedInterest, 0);
+}
 
 export function createAccount(initialCapital: Money): Account {
   return {
@@ -92,7 +96,7 @@ export function markToMarket(account: Account, prices: Map<string, number>): voi
     if (p === undefined) continue;
     positionsValue += pos.quantity * p;
   }
-  account.equity = account.cash + positionsValue;
+  account.equity = account.cash + positionsValue - loanLiabilities(account);
 
   const performanceEquity = account.equity + (account.distributedCapital ?? 0);
   if (performanceEquity > account.peakEquity) account.peakEquity = performanceEquity;

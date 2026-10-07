@@ -10,6 +10,7 @@
 import { BEGINNER_RULES, limitBeginnerFill, settleBeginnerRisk } from './beginner.ts';
 import { fingerprint, SAVE_VERSION, validateSave, type GameSave } from './save.ts';
 import { createFund, settleFund } from './fund.ts';
+import { BANK_RULES, initializeBank, settleBank } from './bank.ts';
 import type {
   Account,
   Bar,
@@ -151,7 +152,7 @@ export class GameEngine {
 
     const difficulty = options.config?.difficulty ?? DEFAULT_CONFIG.difficulty;
     const requestedIdentity = options.config?.identity ?? DEFAULT_CONFIG.identity;
-    const identity = difficulty === 0 && requestedIdentity !== 'hedge_fund' ? 'retail' : requestedIdentity;
+    const identity = difficulty === 0 && !['hedge_fund', 'bank'].includes(requestedIdentity) ? 'retail' : requestedIdentity;
     const profile = IDENTITY_PROFILE[identity];
     this.config = {
       ...DEFAULT_CONFIG,
@@ -237,8 +238,10 @@ export class GameEngine {
     }
 
     this.haircutRatchet = startMacro.repoHaircut;
+    if (difficulty === 0 && identity === 'bank') initializeBank(account, prices, this.config);
 
     this.state = {
+      ...(difficulty === 0 && identity === 'bank' ? { bank: { defaulted: false } } : {}),
       ...(difficulty === 0 && identity === 'hedge_fund' ? { fund: createFund(this.config) } : {}),
       config: this.config,
       date: this.config.startDate,
@@ -279,7 +282,7 @@ export class GameEngine {
   }
 
   get isOver(): boolean {
-    return this.state.date >= this.config.endDate || this.state.player.bankrupt || this.state.fund?.defaulted === true;
+    return this.state.date >= this.config.endDate || this.state.player.bankrupt || this.state.fund?.defaulted === true || this.state.bank?.defaulted === true;
   }
 
   /** 剩余交易日数 */
@@ -295,6 +298,11 @@ export class GameEngine {
         !['buy', 'sell'].includes(order.side) || order.kind !== 'market') throw new Error('订单无效：仅支持已知标的的正整数市价单');
     if (this.state.pendingOrders.length >= 1000) throw new Error('待处理订单过多');
     this.state.pendingOrders.push({ ...order, submittedAt: this.state.date });
+  }
+
+  requestBankRepayment(): void {
+    if (!this.state.bank || this.isOver) throw new Error('当前不能提交银行偿债指令');
+    this.state.bankRepaymentPending = true;
   }
 
   /** 便捷封装：按金额下单（正=买入，负=卖出）。 */
@@ -563,6 +571,11 @@ export class GameEngine {
       this.settleSecuritiesLending(nextDate, fills, spxReturn);
     }
     const borrowFees = accrueBorrowFees(this.state.player, this.state.prices);
+    const banking = this.state.bank ? settleBank(this.state.player, this.state.prices, nextDate, this.state.bankRepaymentPending === true) : undefined;
+    if (banking && this.state.bank) {
+      this.state.bank.defaulted = banking.defaulted;
+      newNews.push(...banking.news);
+    }
     markToMarket(this.state.player, this.state.prices);
 
     // ---- 9) 回购融资与被迫卖出 ----
@@ -601,21 +614,24 @@ export class GameEngine {
     this.state.score.push(snap);
 
     // ---- 14) 记账与清理 ----
-    if (this.state.pendingOrders.length > 0) {
-      const action: PlayerAction = { turnIndex: this.state.turnIndex, date: nextDate, orders: this.state.pendingOrders };
+    if (this.state.pendingOrders.length > 0 || this.state.bankRepaymentPending) {
+      const action: PlayerAction = { turnIndex: this.state.turnIndex, date: nextDate, orders: this.state.pendingOrders,
+        ...(this.state.bankRepaymentPending ? { repayLoans: true } : {}) };
       this.state.news.push(...newNews);
       this.state.pendingOrders = [];
       this.actions.push(structuredClone(action));
     } else {
       this.state.news.push(...newNews);
     }
+    delete this.state.bankRepaymentPending;
 
     this.prevPrices = new Map(this.state.prices);
 
     const commission = fills.reduce((sum, fill) => sum + fill.commission, 0);
     this.reports.push({
       date: nextDate, equityBefore, equityAfter: this.state.player.equity,
-      marketPnl: this.state.player.equity - equityBefore + commission + borrowFees + (redemption?.capitalOutflow ?? 0),
+      marketPnl: this.state.player.equity - equityBefore + commission + borrowFees + (redemption?.capitalOutflow ?? 0) + (banking?.loanInterest ?? 0),
+      ...(banking ? { loanInterest: banking.loanInterest, principalRepaid: banking.principalRepaid, interestPaid: banking.interestPaid } : {}),
       ...(redemption ? { capitalOutflow: redemption.capitalOutflow } : {}),
       commission, borrowFees, fills: structuredClone(fills), firedEventIds: [...firedEventIds],
     });
@@ -879,7 +895,7 @@ export class GameEngine {
 
       if (this.config.difficulty === 0) {
         const openingPrices = new Map([...newBars].map(([id, bar]) => [id, bar.open]));
-        fill = limitBeginnerFill(this.state.player, openingPrices, fill);
+        fill = limitBeginnerFill(this.state.player, openingPrices, fill, this.state.bank ? BANK_RULES.exposureLimit : 1);
       }
       fill.filledAt = date;
       if (fill.quantity > 0) {
@@ -1212,6 +1228,7 @@ export class GameEngine {
       equity: this.state.player.equity,
       actions: structuredClone(this.actions),
       pendingOrders: structuredClone(this.state.pendingOrders),
+      ...(this.state.bankRepaymentPending ? { bankRepaymentPending: true } : {}),
       stateHash: fingerprint(this.state),
     };
   }
@@ -1226,6 +1243,7 @@ export class GameEngine {
       if (engine.isOver) throw new Error('存档包含结束后的操作');
       const action = input.actions[cursor];
       if (action?.turnIndex === turn) {
+        if (action.repayLoans) engine.requestBankRepayment();
         for (const order of action.orders) engine.submitOrder(order);
         cursor++;
       }
@@ -1233,6 +1251,7 @@ export class GameEngine {
       if (action?.turnIndex === turn && action.date !== result.date) throw new Error('操作日志日期不一致');
     }
     for (const order of input.pendingOrders) engine.submitOrder(order);
+    if (input.bankRepaymentPending) engine.requestBankRepayment();
     if (engine.state.date !== input.date || fingerprint(engine.state) !== input.stateHash) {
       throw new Error('存档回放校验失败，原存档已保留');
     }

@@ -229,6 +229,7 @@ export interface Position {
 }
 
 export interface Account {
+  loans?: Loan[];
   /** 教学基金已返还投资者的资本，供收益和回撤剔除外部现金流。 */
   distributedCapital?: Money;
   cash: Money;
@@ -344,6 +345,7 @@ export interface NPCAgent {
 // ---------------------------------------------------------------- 状态与结果
 
 export interface PlayerAction {
+  repayLoans?: boolean;
   turnIndex: number;
   date: DateStr;
   orders: Order[];
@@ -356,6 +358,8 @@ export interface ScoreSnapshot {
 }
 
 export interface GameState {
+  bank?: { defaulted: boolean };
+  bankRepaymentPending?: boolean;
   fund?: FundState;
   config: GameConfig;
   date: DateStr;
@@ -389,6 +393,9 @@ export interface TurnResult {
 }
 
 export interface TurnReport {
+  loanInterest?: Money;
+  principalRepaid?: Money;
+  interestPaid?: Money;
   capitalOutflow?: Money;
   date: DateStr;
   equityBefore: Money;
@@ -404,6 +411,15 @@ export interface TurnReport {
 export interface FundState {
   payments: Array<{ date: DateStr; amount: Money; status: 'pending' | 'paid' | 'missed' }>;
   defaulted: boolean;
+}
+
+export interface Loan {
+  id: string;
+  principal: Money;
+  accruedInterest: Money;
+  annualRate: number;
+  dueDate: DateStr;
+  status: 'active' | 'repaid' | 'defaulted';
 }
 
 // ---------------------------------------------------------------- 真实历史数据

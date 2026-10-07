@@ -291,10 +291,10 @@ export function App() {
             <span>
               <Tip text={BUTTON_TIPS.identity}>身份 ⓘ</Tip>
             </span>
-            <select value={difficulty === 0 && identity !== 'hedge_fund' ? 'retail' : identity} onChange={(e) => setIdentity(e.target.value as Identity)}>
-              {(Object.keys(IDENTITY_LABEL) as Identity[]).filter(k => difficulty !== 0 || k === 'retail' || k === 'hedge_fund').map((k) => (
+            <select value={difficulty === 0 && !['hedge_fund', 'bank'].includes(identity) ? 'retail' : identity} onChange={(e) => setIdentity(e.target.value as Identity)}>
+              {(Object.keys(IDENTITY_LABEL) as Identity[]).filter(k => difficulty !== 0 || k === 'retail' || k === 'hedge_fund' || k === 'bank').map((k) => (
                 <option key={k} value={k}>
-                  {difficulty === 0 && k === 'hedge_fund' ? '基金经理（教学版，$1000 万）' : IDENTITY_LABEL[k]}
+                  {difficulty === 0 && k === 'hedge_fund' ? '基金经理（教学版，$1000 万）' : difficulty === 0 && k === 'bank' ? '银行资金经理（教学版，自有资本 $10 亿）' : IDENTITY_LABEL[k]}
                 </option>
               ))}
             </select>
@@ -350,13 +350,14 @@ export function App() {
         {hasSave && <p>开始新的 D0 游戏会覆盖上次存档；D1 及以上暂不提供自动续玩。</p>}
         {difficulty === 0 && (
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
-            <b>D0 是新手模式：只有 2 个标的、4 个按钮。</b>
+            <b>D0 是新手模式：保留 2 个标的、4 个基础交易按钮，并提供角色专属操作。</b>
             {'\n\n'}
-            使用历史时间线，事件日期不随种子漂移。散户练习买入、做空和管理持仓；基金经理还须按时兑付投资者赎回。不启用 NPC、真假传闻、回购融资或监管处罚。
+            使用历史时间线，事件日期不随种子漂移。散户练习买入、做空和管理持仓；基金经理还须按时兑付投资者赎回；银行资金经理接手证券资产和两笔真实记账的到期借款。不启用 NPC、真假传闻、回购融资或监管处罚。
             {'\n\n'}
             买入、做空和平仓推进 1 个交易日；观望最多推进 5 日，遇到事件或风险提前暂停。
             {'\n\n'}
             基金经理在开局后的第 10、25 个交易日收盘，各兑付初始资金的 10%。到期前会暂停快进；兑付资金不计作投资亏损。
+            银行借款于开局后第 15、30 个交易日收盘到期，按未还本金年化 5% 计息；可提前偿债，或卖出资产准备现金。
             保留适合新手的历史事件新闻。做空按固定费率收费，触及明确的风险底线时自动回补；具体规则可在账户面板查看。
           </div>
         )}
