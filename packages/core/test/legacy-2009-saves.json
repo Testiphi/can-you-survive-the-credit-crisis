@@ -1,0 +1,178 @@
+[
+  {
+    "version": 1,
+    "datasetHash": "4c78f36f",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "retail",
+      "initialCapital": 100000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31"
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 100000,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "b1aac407"
+  },
+  {
+    "version": 1,
+    "datasetHash": "d0174f5b",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "retail",
+      "initialCapital": 100000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31",
+      "demoVersion": 1,
+      "marketRevision": 1
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 100000,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "a18c5df4"
+  },
+  {
+    "version": 1,
+    "datasetHash": "4c78f36f",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "hedge_fund",
+      "initialCapital": 10000000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31"
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 10000000,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "7acf6ebe"
+  },
+  {
+    "version": 1,
+    "datasetHash": "d0174f5b",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "hedge_fund",
+      "initialCapital": 10000000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31",
+      "demoVersion": 1,
+      "marketRevision": 1
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 10000000,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "52727b0d"
+  },
+  {
+    "version": 1,
+    "datasetHash": "4c78f36f",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "bank",
+      "initialCapital": 1000000000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31"
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 993118257.0815873,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "822bbaa3"
+  },
+  {
+    "version": 1,
+    "datasetHash": "d0174f5b",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "bank",
+      "initialCapital": 1000000000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31",
+      "demoVersion": 1,
+      "marketRevision": 1
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 993118257.0815873,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "a8ac115e"
+  },
+  {
+    "version": 1,
+    "datasetHash": "4c78f36f",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "insurer",
+      "initialCapital": 10000000000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31"
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 10000000000,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "ed8fa2c6"
+  },
+  {
+    "version": 1,
+    "datasetHash": "d0174f5b",
+    "config": {
+      "seed": 42,
+      "difficulty": 0,
+      "identity": "insurer",
+      "initialCapital": 10000000000,
+      "ironman": true,
+      "timeline": "historical",
+      "startDate": "2009-12-22",
+      "endDate": "2009-12-31",
+      "demoVersion": 1,
+      "marketRevision": 1
+    },
+    "seed": 42,
+    "date": "2009-12-23",
+    "turnIndex": 1,
+    "equity": 10000000000,
+    "actions": [],
+    "pendingOrders": [],
+    "stateHash": "e6458f11"
+  }
+]

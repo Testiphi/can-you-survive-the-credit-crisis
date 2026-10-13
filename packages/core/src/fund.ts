@@ -7,7 +7,7 @@ export function createFund(config: GameConfig): FundState {
   return {
     defaulted: false,
     payments: [10, 25].map(offset => ({
-      date: shiftTradingDays(config.startDate, offset),
+      date: shiftTradingDays(config.startDate, offset, config.calendar),
       amount: Math.round(config.initialCapital * 0.1 * 100) / 100,
       status: 'pending' as const,
     })).filter(p => p.date <= config.endDate),
@@ -23,7 +23,7 @@ export function fundAvailableCash(account: Account, prices: Map<string, number>)
   return Math.max(0, account.cash - 2 * shortValue);
 }
 
-export function settleFund(fund: FundState, account: Account, prices: Map<string, number>, date: string) {
+export function settleFund(fund: FundState, account: Account, prices: Map<string, number>, date: string, calendar?: GameConfig['calendar']) {
   const news: NewsItem[] = [];
   let capitalOutflow = 0;
   for (const payment of fund.payments) {
@@ -44,7 +44,7 @@ export function settleFund(fund: FundState, account: Account, prices: Map<string
         headline: payment.status === 'paid' ? '投资者赎回已兑付' : '投资者赎回未能按期兑付，本局结束',
         body: `本次应付 $${payment.amount.toFixed(2)}，结算前可兑付现金 $${available.toFixed(2)}。已兑付资本不是投资亏损；卖空担保资金不能用于兑付。`,
       });
-    } else if (payment.date === nextTradingDay(date)) {
+    } else if (payment.date === nextTradingDay(date, calendar)) {
       news.push({ id: `fund-reminder-${date}`, date, source: 'system', isTrue: true, credibility: 1,
         headline: '下一交易日有投资者赎回，请检查现金',
         body: `${payment.date} 收盘需兑付 $${payment.amount.toFixed(2)}。现在提交的平仓订单在下一交易日开盘执行，兑付在收盘、扣费和空头风险处理后检查。`,

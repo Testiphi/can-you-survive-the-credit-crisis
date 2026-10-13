@@ -183,6 +183,7 @@ export class GameEngine {
     this.streams = createStreams(this.config.seed);
     this.baseMacro = buildMacroSeries(this.config.startDate, this.config.endDate, this.streams.market, {
       noiseScale: diff.noiseScale,
+      calendar: this.config.calendar,
       // 有真实标普序列时用它作基础路径，锚点插值只在缺口处兜底
       spxSeries: this.realPrices?.spxSeries(),
     });
@@ -196,7 +197,7 @@ export class GameEngine {
       if (direct !== undefined) return direct;
       let cursor = d;
       for (let i = 0; i < 7; i++) {
-        cursor = prevTradingDay(cursor);
+        cursor = prevTradingDay(cursor, this.config.calendar);
         const found = this.macroIndexByDate.get(cursor);
         if (found !== undefined) return found;
       }
@@ -319,7 +320,7 @@ export class GameEngine {
 
   /** 剩余交易日数 */
   get remainingTurns(): number {
-    return tradingDaysBetween(nextTradingDay(this.state.date), this.config.endDate).length;
+    return tradingDaysBetween(nextTradingDay(this.state.date, this.config.calendar), this.config.endDate, this.config.calendar).length;
   }
 
   // ------------------------------------------------------------ 玩家操作
@@ -383,7 +384,7 @@ export class GameEngine {
     }
 
     const diff = DIFFICULTY_PROFILE[this.config.difficulty];
-    const nextDate = nextTradingDay(this.state.date);
+    const nextDate = nextTradingDay(this.state.date, this.config.calendar);
     const equityBefore = this.state.player.equity;
     const idx = this.macroIndexByDate.get(nextDate);
     const base: MacroState =
@@ -618,7 +619,7 @@ export class GameEngine {
     }
     const borrowFees = accrueBorrowFees(this.state.player, this.state.prices);
     const banking = this.state.bank ? settleBank(this.state.player, this.state.prices, nextDate, this.state.bankRepaymentPending === true,
-      { bank: this.state.bank, stress: this.state.macro.systemicStress, endDate: this.config.endDate, request: this.state.bankRefinancePending }) : undefined;
+      { bank: this.state.bank, stress: this.state.macro.systemicStress, endDate: this.config.endDate, request: this.state.bankRefinancePending, calendar: this.config.calendar }) : undefined;
     if (banking && this.state.bank) {
       this.state.bank.defaulted = banking.defaulted;
       newNews.push(...banking.news);
@@ -646,7 +647,7 @@ export class GameEngine {
     }
 
     // 教学基金的赎回是外部资本流出，在当天交易、费用和风险处理后兑付。
-    const redemption = this.state.fund ? settleFund(this.state.fund, this.state.player, this.state.prices, nextDate) : undefined;
+    const redemption = this.state.fund ? settleFund(this.state.fund, this.state.player, this.state.prices, nextDate, this.config.calendar) : undefined;
     if (redemption) newNews.push(...redemption.news);
 
     // ---- 11) 监管 ----
@@ -1391,7 +1392,7 @@ function grossExposureOf(account: Account, prices: Map<string, number>): number 
 
 /** 由起始日生成全部交易日（供 UI 的时间轴使用）。 */
 export function timelineOf(config: GameConfig): string[] {
-  return tradingDaysBetween(config.startDate, config.endDate);
+  return tradingDaysBetween(config.startDate, config.endDate, config.calendar);
 }
 
 export { Rng, addDays, resolveImpact };

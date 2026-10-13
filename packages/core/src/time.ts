@@ -7,6 +7,9 @@
 
 import type { DateStr } from './types.ts';
 
+export type CalendarVersion = 'nyse-2010';
+const HOLIDAYS_2010 = new Set(['2010-01-01', '2010-01-18', '2010-02-15', '2010-04-02', '2010-05-31', '2010-07-05', '2010-09-06', '2010-11-25', '2010-12-24']);
+
 const MS_PER_DAY = 86_400_000;
 
 /** NYSE 休市日（2007–2009）。危机期间市场从未休市——这一点很重要。 */
@@ -65,54 +68,54 @@ export function dayOfWeek(s: DateStr): number {
   return parseDate(s).getUTCDay(); // 0 = 周日
 }
 
-export function isTradingDay(s: DateStr): boolean {
+export function isTradingDay(s: DateStr, calendar?: CalendarVersion): boolean {
   const dow = dayOfWeek(s);
   if (dow === 0 || dow === 6) return false;
-  return !HOLIDAYS.has(s);
+  return !HOLIDAYS.has(s) && !(calendar === 'nyse-2010' && HOLIDAYS_2010.has(s));
 }
 
-export function nextTradingDay(s: DateStr): DateStr {
+export function nextTradingDay(s: DateStr, calendar?: CalendarVersion): DateStr {
   let cur = addDays(s, 1);
   // 安全上限，避免死循环
-  for (let i = 0; i < 30 && !isTradingDay(cur); i++) cur = addDays(cur, 1);
+  for (let i = 0; i < 30 && !isTradingDay(cur, calendar); i++) cur = addDays(cur, 1);
   return cur;
 }
 
-export function prevTradingDay(s: DateStr): DateStr {
+export function prevTradingDay(s: DateStr, calendar?: CalendarVersion): DateStr {
   let cur = addDays(s, -1);
-  for (let i = 0; i < 30 && !isTradingDay(cur); i++) cur = addDays(cur, -1);
+  for (let i = 0; i < 30 && !isTradingDay(cur, calendar); i++) cur = addDays(cur, -1);
   return cur;
 }
 
 /** 含首尾的交易日列表（若首日不是交易日，则从其后的第一个交易日起）。 */
-export function tradingDaysBetween(start: DateStr, end: DateStr): DateStr[] {
+export function tradingDaysBetween(start: DateStr, end: DateStr, calendar?: CalendarVersion): DateStr[] {
   const out: DateStr[] = [];
-  let cur = isTradingDay(start) ? start : nextTradingDay(start);
+  let cur = isTradingDay(start, calendar) ? start : nextTradingDay(start, calendar);
   let guard = 0;
   while (cur <= end && guard++ < 5000) {
     out.push(cur);
-    cur = nextTradingDay(cur);
+    cur = nextTradingDay(cur, calendar);
   }
   return out;
 }
 
 /** 在交易日序列上前后移动 n 步（n 可为负）。 */
-export function shiftTradingDays(s: DateStr, n: number): DateStr {
+export function shiftTradingDays(s: DateStr, n: number, calendar?: CalendarVersion): DateStr {
   let cur = s;
   const step = n >= 0 ? nextTradingDay : prevTradingDay;
-  for (let i = 0; i < Math.abs(n); i++) cur = step(cur);
+  for (let i = 0; i < Math.abs(n); i++) cur = step(cur, calendar);
   return cur;
 }
 
 /** 两个交易日之间的交易日数量差（b 晚于 a 时为正）。 */
-export function tradingDayDiff(a: DateStr, b: DateStr): number {
+export function tradingDayDiff(a: DateStr, b: DateStr, calendar?: CalendarVersion): number {
   if (a === b) return 0;
   const forward = a < b;
   let cur = a;
   let n = 0;
   const limit = 5000;
   while (cur !== b && n < limit) {
-    cur = forward ? nextTradingDay(cur) : prevTradingDay(cur);
+    cur = forward ? nextTradingDay(cur, calendar) : prevTradingDay(cur, calendar);
     n++;
   }
   return forward ? n : -n;

@@ -13,7 +13,7 @@ export function nextFundingDecision(state: GameState) {
   }
   for (const loan of state.player.loans ?? []) {
     if (loan.status === 'active') items.push({ date: loan.dueDate, label: `${loan.id.replace('loan-', '借款 ')} 到期`,
-      amount: loan.principal + loan.accruedInterest + loan.principal * loan.annualRate / 252 * Math.max(0, tradingDayDiff(state.date, loan.dueDate)) });
+      amount: loan.principal + loan.accruedInterest + loan.principal * loan.annualRate / 252 * Math.max(0, tradingDayDiff(state.date, loan.dueDate, state.config.calendar)) });
   }
   if (state.bank?.collateralCallDue) {
     const c = collateralState(state.player, state.prices, state.macro.systemicStress);
@@ -35,7 +35,7 @@ export function nextFundingDecision(state: GameState) {
   const sameDay = items.filter(i => i.date === date);
   const amount = sameDay.every(i => i.amount !== undefined) ? sameDay.reduce((sum, i) => sum + i.amount!, 0) : undefined;
   const availableCash = fundAvailableCash(state.player, state.prices);
-  return { date, days: tradingDayDiff(state.date, date), labels: sameDay.map(i => i.label),
+  return { date, days: tradingDayDiff(state.date, date, state.config.calendar), labels: sameDay.map(i => i.label),
     optional: sameDay.every(i => i.optional), amount, availableCash,
     shortfall: amount === undefined ? undefined : Math.max(0, amount - availableCash) };
 }

@@ -13,7 +13,7 @@ export function initializeBank(account: Account, prices: Map<string, number>, co
   account.loans = [15, 30].map((offset, i) => ({
     id: `loan-${i + 1}`, principal: config.initialCapital / 2, accruedInterest: 0,
     annualRate: BANK_RULES.annualRate,
-    dueDate: [shiftTradingDays(config.startDate, offset), config.endDate].sort()[0],
+    dueDate: [shiftTradingDays(config.startDate, offset, config.calendar), config.endDate].sort()[0],
     status: 'active' as const,
   }));
   account.cash += config.initialCapital;
@@ -29,7 +29,7 @@ export function initializeBank(account: Account, prices: Map<string, number>, co
 
 /** 先按余额计息，再处理主动提前还款，最后检查当日到期合同。 */
 export function settleBank(account: Account, prices: Map<string, number>, date: string, repayEarly: boolean,
-  financing?: { bank: BankState; stress: number; endDate: string; request?: RefinanceRequest }) {
+  financing?: { bank: BankState; stress: number; endDate: string; request?: RefinanceRequest; calendar?: GameConfig['calendar'] }) {
   let loanInterest = 0;
   let principalRepaid = 0;
   let interestPaid = 0;
@@ -44,7 +44,7 @@ export function settleBank(account: Account, prices: Map<string, number>, date: 
     loanInterest += interest;
   }
   if (financing?.request) {
-    const result = executeRefinance(account, prices, financing.stress, date, financing.endDate, financing.request);
+    const result = executeRefinance(account, prices, financing.stress, date, financing.endDate, financing.request, financing.calendar);
     if (result.ok) {
       principalRepaid += result.quote.principalRepaid;
       interestPaid += result.interestPaid;
@@ -75,7 +75,7 @@ export function settleBank(account: Account, prices: Map<string, number>, date: 
     }
     if (due) emit(loan.id, loan.status === 'defaulted' ? '到期借款未能偿还，本局结束' : '到期借款已偿还',
       `${loan.id} 本次到期本息 $${debt.toFixed(2)}，结算前可用现金 $${available.toFixed(2)}。还本不改变净资产，利息按每日余额计入成本。`);
-    else if (loan.status === 'active' && loan.dueDate === nextTradingDay(date)) emit(`reminder-${loan.id}`, '下一交易日有借款到期，请准备现金',
+    else if (loan.status === 'active' && loan.dueDate === nextTradingDay(date, financing?.calendar)) emit(`reminder-${loan.id}`, '下一交易日有借款到期，请准备现金',
       `${loan.id} 在 ${loan.dueDate} 收盘到期；当前本息 $${(loan.principal + loan.accruedInterest).toFixed(2)}，到期日还会计提一天利息。现在可提交平仓或提前偿债指令。`);
   }
   if (financing && !defaulted) {
@@ -97,7 +97,7 @@ export function settleBank(account: Account, prices: Map<string, number>, date: 
         defaulted = true;
         emit('collateral-default', '抵押融资缺口逾期，本局结束', `缺口 $${collateral.shortfall.toFixed(2)}，可用现金 $${available.toFixed(2)}。未支付部分仍保留在负债中。`);
       } else if (!financing.bank.collateralCallDue) {
-        financing.bank.collateralCallDue = [nextTradingDay(date), financing.endDate].sort()[0];
+        financing.bank.collateralCallDue = [nextTradingDay(date, financing?.calendar), financing.endDate].sort()[0];
         defaulted = financing.bank.collateralCallDue <= date;
         emit('collateral-call', defaulted ? '结束日抵押融资缺口未清偿' : '抵押融资出现缺口，请在下一交易日处理',
           `当前需补还本金 $${collateral.shortfall.toFixed(2)}，可用现金 $${available.toFixed(2)}，期限 ${financing.bank.collateralCallDue}。出售资产、提前还款或抵押品价格恢复均会改变下一日重新计算的缺口。`);

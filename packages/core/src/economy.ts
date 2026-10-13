@@ -150,6 +150,7 @@ export interface MacroScheduleOptions {
    * 再加一层 ±0.4% 的日噪声只会让标普偏离事实。
    */
   spxSeries?: Map<string, number>;
+  calendar?: import('./time.ts').CalendarVersion;
 }
 
 /**
@@ -163,7 +164,7 @@ export function buildMacroSeries(
   options: MacroScheduleOptions = {},
 ): MacroState[] {
   const scale = options.noiseScale ?? 1;
-  const days = tradingDaysBetween(startDate, endDate);
+  const days = tradingDaysBetween(startDate, endDate, options.calendar);
   const out: MacroState[] = [];
   const real = options.spxSeries;
 

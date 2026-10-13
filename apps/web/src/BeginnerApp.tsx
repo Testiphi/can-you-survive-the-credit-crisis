@@ -212,7 +212,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote, onExport
           {loan.status === 'active' && !loan.refinancing && <details>
             <summary>查看这笔借款的展期方案</summary>
             {(['secured', 'term'] as const).map(plan => {
-              const quote = refinanceQuote(engine.state.player, engine.state.prices, engine.state.macro.systemicStress, nextTradingDay(engine.state.date), engine.config.endDate, loan, plan);
+              const quote = refinanceQuote(engine.state.player, engine.state.prices, engine.state.macro.systemicStress, nextTradingDay(engine.state.date, engine.config.calendar), engine.config.endDate, loan, plan, engine.config.calendar);
               return <div key={plan} style={{ margin: '10px 0' }}>
                 <b>{plan === 'secured' ? '抵押展期（10 个交易日）' : '无抵押展期（20 个交易日）'}</b>
                 <div>预计新到期日 {quote.dueDate} · 年化 {pct(quote.annualRate)} · 手续费 {money(quote.fee)}</div>
@@ -249,7 +249,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote, onExport
         {insurer.coverage ? <p>再保险已生效：一次性保费 {money(insurer.coverage.premium)}。
           每笔先自留初始资本的 5%，超出部分由再保险承担 50%。</p> : <>
           <p>可选再保险：当前估计保费 {money(reinsurancePrice(engine.config.initialCapital, engine.state.macro.systemicStress))}，一次性支付；每笔赔款超过初始资本 5% 的部分，赔付 50%。必须在 {insurer.purchaseDeadline} 收盘前成交。</p>
-          <button disabled={engine.isOver || nextTradingDay(engine.state.date) > insurer.purchaseDeadline} onClick={() => { engine.requestReinsurance(); advanceSession([], 1); }}>购买再保险（推进一天）</button>
+          <button disabled={engine.isOver || nextTradingDay(engine.state.date, engine.config.calendar) > insurer.purchaseDeadline} onClick={() => { engine.requestReinsurance(); advanceSession([], 1); }}>购买再保险（推进一天）</button>
           <p>次日按当时压力重算报价并检查现金；购买后不退费。也可以保留现金，自行承担赔款。</p>
         </>}
       </div>}

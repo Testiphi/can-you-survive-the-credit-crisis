@@ -8,10 +8,10 @@ const roundMoney = (n: number) => Math.round(n * 100) / 100;
 const pressure = (stress: number) => Math.max(0, Math.min(1, stress));
 
 export function createInsurer(config: GameConfig): InsurerState {
-  return { defaulted: false, purchaseDeadline: shiftTradingDays(config.startDate, 5),
+  return { defaulted: false, purchaseDeadline: shiftTradingDays(config.startDate, 5, config.calendar),
     claims: [15, 30].map(offset => {
-      const assessmentDate = shiftTradingDays(config.startDate, offset);
-      return { assessmentDate, dueDate: nextTradingDay(assessmentDate), status: 'scheduled' as const };
+      const assessmentDate = shiftTradingDays(config.startDate, offset, config.calendar);
+      return { assessmentDate, dueDate: nextTradingDay(assessmentDate, config.calendar), status: 'scheduled' as const };
     }).filter(c => c.dueDate <= config.endDate) };
 }
 
@@ -67,7 +67,7 @@ export function settleInsurance(state: InsurerState, account: Account, prices: M
       emit('payment', claim.status === 'paid' ? '赔款已支付' : '赔款现金不足，本局结束', `再保险到账 $${recovery.toFixed(2)}，支付前可用现金 $${available.toFixed(2)}，应付 $${gross.toFixed(2)}。未付赔款继续计入负债。`);
     }
   }
-  if (!state.coverage && nextTradingDay(date) === state.purchaseDeadline) {
+  if (!state.coverage && nextTradingDay(date, config.calendar) === state.purchaseDeadline) {
     emit('deadline', '下一交易日是再保险购买截止日', '可以现在提交购买指令，也可以保留现金自行承担赔付。截止后不能等赔款金额揭晓再购买。');
   }
   markToMarket(account, prices);
