@@ -1,3 +1,4 @@
+import { beginnerPeriodConfig } from '../src/chapter.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/engine.ts';
@@ -39,7 +40,7 @@ test('positive NAV cannot pay a cash claim; unpaid amount remains a liability',(
 });
 test('insurance commands and accounting replay across claims and payments in every period',()=>{
   for(const p of BEGINNER_PERIODS){
-    const a=new GameEngine(data,{config:{difficulty:0,identity:'insurer',startDate:p.startDate,endDate:p.endDate}});
+    const a=new GameEngine(data,{config:{difficulty:0,identity:'insurer',...beginnerPeriodConfig(p)}});
     a.requestReinsurance();const b=GameEngine.restore(data,JSON.parse(JSON.stringify(a.save())));
     while(!a.isOver)assert.deepEqual(b.advance(),a.advance());
     assert.deepEqual(a.state,b.state);assert.deepEqual(a.turnReports,b.turnReports);
@@ -50,11 +51,11 @@ test('insurance commands and accounting replay across claims and payments in eve
   }
 });
 
-test('cash strategies show a genuine coverage tradeoff across the five historical periods',()=>{
+test('cash strategies show a genuine coverage tradeoff across the historical periods',()=>{
   let coverBetter=false,selfBetter=false;
   for(const p of BEGINNER_PERIODS){
     const ends=[false,true].map(covered=>{
-      const e=new GameEngine(data,{config:{difficulty:0,identity:'insurer',seed:42,startDate:p.startDate,endDate:p.endDate}});
+      const e=new GameEngine(data,{config:{difficulty:0,identity:'insurer',seed:42,...beginnerPeriodConfig(p)}});
       if(covered)e.requestReinsurance();while(!e.isOver)e.advance();return e.state.player.equity;
     });
     coverBetter ||= ends[1]>ends[0];selfBetter ||= ends[0]>ends[1];

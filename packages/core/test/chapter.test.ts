@@ -1,3 +1,4 @@
+import { beginnerPeriodConfig } from '../src/chapter.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/engine.ts';
@@ -34,14 +35,14 @@ test('daily and total statements reconcile, and survive save/replay', () => {
 test('all beginner periods use their own objectives and survive a save/replay round trip', async () => {
   const { BEGINNER_PERIODS, beginnerPeriod } = await import('../src/chapter.ts');
   for (const period of BEGINNER_PERIODS) {
-    const e = new GameEngine(data, { config: { difficulty: 0, startDate: period.startDate, endDate: period.endDate } });
+    const e = new GameEngine(data, { config: { difficulty: 0, ...beginnerPeriodConfig(period) } });
     e.submitByNotional('SPX', 25000);
     for (let i = 0; i < 5; i++) e.advance();
     const resumed = GameEngine.restore(data, JSON.parse(JSON.stringify(e.save())));
     while (!e.isOver) assert.deepEqual(resumed.advance(), e.advance());
     assert.equal(e.state.date, period.endDate);
     assert.equal(beginnerPeriod(e.config)?.id, period.id);
-    assert.ok(e.state.turnIndex >= 35 && e.state.turnIndex <= 50);
+    assert.ok(e.state.turnIndex >= 35 && e.state.turnIndex <= 65);
     const below = reviewRun(e.config, e.config.initialCapital * period.capitalFloor - 1, period.drawdownLimit + 0.01, false, []);
     assert.equal(below.capitalPreserved, false);
     assert.equal(below.drawdownControlled, false);

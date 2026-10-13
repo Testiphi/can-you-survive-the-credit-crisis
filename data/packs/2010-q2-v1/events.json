@@ -1,0 +1,397 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "id": "qe1_purchase_completed",
+      "phase": 5,
+      "date": "2010-03-31",
+      "title": "QE1 购买阶段完成",
+      "headline": "美联储机构 MBS 购买阶段完成，既有持仓与后续结算仍继续",
+      "narrative": "停止新增购买不等于立即出售持仓，也不等于流动性工具全部退出。本卡仅用于本章开局背景。",
+      "window": [
+        "2010-03-31",
+        "2010-03-31"
+      ],
+      "requires": [
+        "fomc_qe"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.federalreserve.gov/monetarypolicy/clbs_SOMA_201005.htm"
+      ]
+    },
+    {
+      "id": "ecb_collateral_2010",
+      "phase": 5,
+      "date": "2010-04-08",
+      "title": "ECB 延续抵押品门槛",
+      "headline": "欧洲央行宣布 BBB- 抵押品评级门槛延续至 2010 年后",
+      "narrative": "公告中的分级折扣安排从 2011 年实施。本章不把未来政策当作当日已经生效的交易规则。",
+      "window": [
+        "2010-04-08",
+        "2010-04-08"
+      ],
+      "requires": [],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.ecb.europa.eu/press/pr/date/2010/html/pr100408_1.en.html"
+      ]
+    },
+    {
+      "id": "greece_requests_aid",
+      "phase": 5,
+      "date": "2010-04-23",
+      "title": "希腊申请援助",
+      "headline": "希腊正式向欧盟和 IMF 请求金融援助",
+      "narrative": "主权融资压力进入跨国援助程序。申请、达成协议与资金获批是不同阶段。",
+      "window": [
+        "2010-04-23",
+        "2010-04-23"
+      ],
+      "requires": [
+        "ecb_collateral_2010"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "overseas",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.elibrary.imf.org/display/book/9781475562538/ch007.xml"
+      ]
+    },
+    {
+      "id": "greece_downgrade_2010",
+      "phase": 5,
+      "date": "2010-04-27",
+      "title": "希腊评级下调",
+      "headline": "标普将希腊主权评级下调至非投资级",
+      "narrative": "信用评级变化提示融资约束，本章仍按美国市场实际日线成交，不用事件卡重复制造价格跳空。",
+      "window": [
+        "2010-04-27",
+        "2010-04-27"
+      ],
+      "requires": [
+        "greece_requests_aid"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "overseas",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.elibrary.imf.org/display/book/9781475562538/ch007.xml"
+      ]
+    },
+    {
+      "id": "greece_staff_agreement",
+      "phase": 5,
+      "date": "2010-05-02",
+      "title": "希腊援助达成协议",
+      "headline": "IMF 宣布与希腊达成员工层面协议，拟提供 300 亿欧元支持",
+      "narrative": "援助方案尚有审批程序。周日公告在下一个美国交易日进入新闻，不提前影响周五的玩家决定。",
+      "window": [
+        "2010-05-02",
+        "2010-05-02"
+      ],
+      "requires": [
+        "greece_requests_aid"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.imf.org/external/np/sec/pr/2010/pr10176.htm"
+      ]
+    },
+    {
+      "id": "flash_crash_2010",
+      "phase": 5,
+      "date": "2010-05-06",
+      "title": "闪电崩盘",
+      "headline": "美国市场盘中急跌后快速反弹，交易秩序受到冲击",
+      "narrative": "本作只有日线与次日开盘成交，不模拟盘中抢单或保证能在最低点成交。日线高低价记录市场波动，不是玩家可以任选的成交价。",
+      "window": [
+        "2010-05-06",
+        "2010-05-06"
+      ],
+      "requires": [],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "macro",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.sec.gov/newsroom/speeches-statements/ts051110mls-testimony-concerning-severe-market-disruption-may-6-2010"
+      ]
+    },
+    {
+      "id": "greece_imf_approval",
+      "phase": 5,
+      "date": "2010-05-09",
+      "title": "IMF 批准希腊贷款",
+      "headline": "IMF 批准 300 亿欧元贷款，纳入总额 1100 亿欧元的联合援助方案",
+      "narrative": "获批是援助链条的新阶段，不代表风险已经消失，也不是对之后上涨的承诺。",
+      "window": [
+        "2010-05-09",
+        "2010-05-09"
+      ],
+      "requires": [
+        "greece_staff_agreement"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.imf.org/external/np/sec/pr/2010/pr10187.htm"
+      ]
+    },
+    {
+      "id": "fed_swaps_reopened",
+      "phase": 5,
+      "date": "2010-05-09",
+      "title": "美元互换重启",
+      "headline": "美联储宣布重新建立与多家央行的临时美元流动性互换安排",
+      "narrative": "美元资金压力得到政策回应。互换是流动性工具，不等于免除借款人的本金义务。",
+      "window": [
+        "2010-05-09",
+        "2010-05-09"
+      ],
+      "requires": [
+        "greece_requests_aid"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "funding",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.federalreserve.gov/newsevents/pressreleases/monetary20100509a.htm"
+      ]
+    },
+    {
+      "id": "ecb_smp_2010",
+      "phase": 5,
+      "date": "2010-05-10",
+      "title": "ECB 启动证券市场计划",
+      "headline": "欧洲央行公布证券市场计划及流动性措施",
+      "narrative": "政策干预与融资压力可以同时存在。检查现金和到期义务，再决定是否增加风险敞口。",
+      "window": [
+        "2010-05-10",
+        "2010-05-10"
+      ],
+      "requires": [
+        "greece_imf_approval"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.ecb.europa.eu/press/pr/date/2010/html/pr100510.en.html"
+      ]
+    },
+    {
+      "id": "efsf_incorporated",
+      "phase": 5,
+      "date": "2010-06-07",
+      "title": "EFSF 成立",
+      "headline": "欧洲金融稳定工具在卢森堡成立",
+      "narrative": "稳定工具的设立与对具体国家发放贷款不是同一件事。本章不虚构当天已完成救助拨款。",
+      "window": [
+        "2010-06-07",
+        "2010-06-07"
+      ],
+      "requires": [
+        "ecb_smp_2010"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.esm.europa.eu/content/what-efsf"
+      ]
+    },
+    {
+      "id": "sec_circuit_breakers_2010",
+      "phase": 5,
+      "date": "2010-06-10",
+      "title": "美国单股熔断规则获批",
+      "headline": "SEC 批准新的单股熔断试点规则",
+      "narrative": "规则针对盘中交易中断，本作不模拟分钟级熔断，因此该卡提供历史背景，不修改既有日线订单执行方式。",
+      "window": [
+        "2010-06-10",
+        "2010-06-10"
+      ],
+      "requires": [
+        "flash_crash_2010"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.sec.gov/newsroom/press-releases/2010-98-sec-approves-new-stock-stock-circuit-breaker-rules"
+      ]
+    },
+    {
+      "id": "eu_stress_test_disclosure",
+      "phase": 5,
+      "date": "2010-06-17",
+      "title": "欧洲承诺公布银行压力测试",
+      "headline": "欧洲理事会同意在 7 月下旬前公布银行压力测试结果",
+      "narrative": "今天公开的是披露安排，测试结果尚未公布。章节到 6 月末结束，不把 7 月结果提前展示给玩家。",
+      "window": [
+        "2010-06-17",
+        "2010-06-17"
+      ],
+      "requires": [
+        "efsf_incorporated"
+      ],
+      "requireAnyOf": [],
+      "trigger": {
+        "type": "scheduled",
+        "probabilityPerDay": 1
+      },
+      "tier": "policy",
+      "reversible": false,
+      "isSystemicEvent": true,
+      "impact": {
+        "targets": [
+          "SPX"
+        ],
+        "decayDays": 1
+      },
+      "newsVisibility": 0,
+      "sources": [
+        "https://www.consilium.europa.eu/ueDocs/cms_Data/docs/pressData/en/ec/115346.pdf"
+      ]
+    }
+  ]
+}

@@ -8,7 +8,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   GameEngine,
-  BEGINNER_PERIODS,
+  BEGINNER_PERIODS, beginnerPeriodConfig,
   DEMO_CHAPTERS,
   type GameSave,
   INSTRUMENTS,
@@ -109,7 +109,7 @@ export function App() {
           marketRevision: 1,
           ...(opts.difficulty === 0 ? { demoVersion: 1 as const } : {}),
           ...(opts.difficulty === 0 && period ? {
-            startDate: period.startDate, endDate: period.endDate,
+            ...beginnerPeriodConfig(period),
           } : { startDate: '2007-01-03', endDate: '2009-12-31' }),
         },
       });
@@ -406,7 +406,7 @@ export function App() {
         )}
         {difficulty !== 0 && (
           <div className="hint info" style={{ marginTop: 22, textAlign: 'left' }}>
-            <b>D1 及以上是实验模式；本次完整演示流程以 D0 的五章与四角色为准。</b>
+            <b>D1 及以上是实验模式；本次完整演示流程以 D0 的六章与四角色为准。</b>
             {'\n\n'}
             每个按钮、每个指标名都可以把鼠标停上去看说明。
             {'\n\n'}
@@ -415,7 +415,7 @@ export function App() {
           </div>
         )}
         <p style={{ marginTop: 22, fontSize: 11 }}>
-          已载入 {dataset.events.length} 张事件卡 · {dataset.institutions.institutions.length} 家机构 ·{' '}
+          已载入 {dataset.events.length} 张基础事件卡 + {Object.values(dataset.periodPacks ?? {}).reduce((n, p) => n + p.events.length, 0)} 张扩展卡 · {dataset.institutions.institutions.length} 家机构 ·{' '}
           {dataset.rumors.templates.length} 类传闻
         </p>
       </div>

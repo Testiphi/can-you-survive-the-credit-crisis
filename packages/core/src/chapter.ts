@@ -23,7 +23,16 @@ export const BEGINNER_PERIODS = [
   { id: 'repair', title: '修复期：退出紧急状态', startDate: '2009-05-01', endDate: '2009-06-30',
     capitalFloor: 0.8, drawdownLimit: 0.25,
     briefing: '此前已推出资产购买、财政与金融稳定措施。市场在等待银行压力测试和资本补充进展；练习有节制地恢复风险敞口，同时完成既有义务。' },
+  { id: 'europe', title: '欧债与闪崩：修复后的压力', startDate: '2010-04-01', endDate: '2010-06-30',
+    capitalFloor: 0.8, drawdownLimit: 0.25,
+    briefing: '美国资产购买阶段刚结束，欧洲主权融资压力进入视野。继续管理原有账户与合同，区分市场价格、现金需求和政策公告。' },
 ] as const;
+
+/** Keep the dates and version selectors together for every entry point. */
+export function beginnerPeriodConfig(period: (typeof BEGINNER_PERIODS)[number]): Partial<GameConfig> {
+  return { startDate: period.startDate, endDate: period.endDate,
+    ...(period.id === 'europe' ? { periodPack: '2010-q2-v1' as const, calendar: 'nyse-2010' as const, demoVersion: 1 as const } : {}) };
+}
 
 export const DEMO_CHAPTERS = [...BEGINNER_PERIODS].sort((a, b) => a.startDate.localeCompare(b.startDate));
 

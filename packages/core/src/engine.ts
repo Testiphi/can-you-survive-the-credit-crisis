@@ -1,3 +1,4 @@
+import { validatePeriodConfig, validatePeriodPack, periodMacro, type PeriodPack } from './period-pack.ts';
 /**
  * GameEngine —— 引擎的唯一对外门面。
  *
@@ -77,6 +78,7 @@ import { makeContext } from './conditions.ts';
 import { RealPriceSource, REAL_PATH_SHOCK_SCALE } from './market-data.ts';
 
 export interface Dataset {
+  periodPacks?: Record<string, PeriodPack>;
   marketPatch?: MarketPatch;
   events: EventCard[];
   institutions: InstitutionsFile;
@@ -150,18 +152,23 @@ export class GameEngine {
   private realPrices: RealPriceSource | null = null;
 
   constructor(dataset: Dataset, options: EngineOptions = {}) {
-    const { marketPatch, ...legacyDataset } = dataset;
+    validatePeriodConfig(options.config ?? {});
+    const { marketPatch, periodPacks, ...legacyDataset } = dataset;
+    const pack = options.config?.periodPack ? periodPacks?.[options.config.periodPack] : undefined;
+    if (options.config?.periodPack && !pack) throw new Error('时期数据包缺失');
+    if (pack) validatePeriodPack(pack);
     dataset = legacyDataset;
     if (options.config?.marketRevision !== undefined) {
       if (options.config.marketRevision !== 1) throw new Error('不支持的行情修订版本');
-      dataset = { ...dataset, market: applyMarketRevision(dataset.market, marketPatch) };
+      if (!pack) dataset = { ...dataset, market: applyMarketRevision(dataset.market, marketPatch) };
     }
     if (options.config?.demoVersion !== undefined) {
       if (options.config.difficulty !== 0) throw new Error('演示版规则仅适用于 D0');
       dataset = { ...dataset, events: demoEvents(dataset.events, options.config.demoVersion) };
     }
+    if (pack) dataset = { ...dataset, market: pack.market, events: [...dataset.events, ...pack.events] };
     this.dataset = dataset;
-    this.datasetHash = fingerprint(dataset);
+    this.datasetHash = fingerprint(pack ? { ...dataset, periodPack: pack } : dataset);
     this.opts = options;
 
     const difficulty = options.config?.difficulty ?? DEFAULT_CONFIG.difficulty;
@@ -181,7 +188,7 @@ export class GameEngine {
     this.realPrices = dataset.market ? new RealPriceSource(dataset.market) : null;
 
     this.streams = createStreams(this.config.seed);
-    this.baseMacro = buildMacroSeries(this.config.startDate, this.config.endDate, this.streams.market, {
+    this.baseMacro = pack ? periodMacro(pack, this.config) : buildMacroSeries(this.config.startDate, this.config.endDate, this.streams.market, {
       noiseScale: diff.noiseScale,
       calendar: this.config.calendar,
       // 有真实标普序列时用它作基础路径，锚点插值只在缺口处兜底
@@ -230,7 +237,7 @@ export class GameEngine {
     // 到数据起点之间会出现一段跳空。
     const bars = new Map<string, Bar[]>();
     const prices = new Map<string, number>();
-    for (const inst of INSTRUMENTS) {
+    for (const inst of INSTRUMENTS.filter(i => !this.config.periodPack || !!this.dataset.market?.series[i.id])) {
       const realFirst = difficulty === 0 || this.config.marketRevision === 1
         ? this.realPrices?.barOnOrBefore(inst.id, this.config.startDate)
         : this.realPrices?.firstBar(inst.id);
@@ -241,12 +248,12 @@ export class GameEngine {
       bars.set(inst.id, [
         {
           date: this.config.startDate,
-          provenance: this.config.marketRevision === 1
+          provenance: (this.config.marketRevision === 1 || this.config.periodPack)
             ? realFirst?.date === this.config.startDate && !isEstimatedMarketBar(realFirst) ? 'historical' : realFirst ? 'estimated' : 'synthetic'
             : difficulty === 0 ? (realFirst ? 'estimated' : 'synthetic') : realFirst && isEstimatedMarketBar(realFirst) ? 'estimated' : undefined,
-          open: this.config.marketRevision === 1 && realFirst?.date === this.config.startDate ? realFirst.open : startPrice,
-          high: this.config.marketRevision === 1 && realFirst?.date === this.config.startDate ? realFirst.high : startPrice,
-          low: this.config.marketRevision === 1 && realFirst?.date === this.config.startDate ? realFirst.low : startPrice,
+          open: (this.config.marketRevision === 1 || this.config.periodPack) && realFirst?.date === this.config.startDate ? realFirst.open : startPrice,
+          high: (this.config.marketRevision === 1 || this.config.periodPack) && realFirst?.date === this.config.startDate ? realFirst.high : startPrice,
+          low: (this.config.marketRevision === 1 || this.config.periodPack) && realFirst?.date === this.config.startDate ? realFirst.low : startPrice,
           close: startPrice,
           volume: realFirst?.volume || Math.round(inst.baseAdv / Math.max(0.5, startPrice)),
           adv20: inst.baseAdv,
@@ -288,7 +295,7 @@ export class GameEngine {
         }
       }
       // 当日收盘已包含过去事件的价格结果，不再叠加过去冲击。
-      this.state.news = past.filter(card => card.newsVisibility === 0).slice(-3).map(card => ({
+      this.state.news = past.filter(card => card.newsVisibility === 0 && (!pack || pack.events.some(e => e.id === card.id))).slice(-3).map(card => ({
         id: `opening-${card.id}`, date: card.date, headline: card.headline,
         body: `开局已知背景。${card.narrative}`, source: 'historical', credibility: 1, isTrue: true, eventId: card.id,
       }));
@@ -329,6 +336,7 @@ export class GameEngine {
     if (this.isOver) throw new Error('本局已结束，不能下单');
     if (!order || !INSTRUMENT_BY_ID.has(order.instrumentId) || !Number.isSafeInteger(order.quantity) || order.quantity <= 0 ||
         !['buy', 'sell'].includes(order.side) || order.kind !== 'market') throw new Error('订单无效：仅支持已知标的的正整数市价单');
+    if (this.config.periodPack && !this.dataset.market?.series[order.instrumentId]) throw new Error('本时期没有该标的的有效行情');
     if (this.state.pendingOrders.length >= 1000) throw new Error('待处理订单过多');
     this.state.pendingOrders.push({ ...order, submittedAt: this.state.date });
   }
@@ -455,6 +463,9 @@ export class GameEngine {
       repoHaircut: clamp(this.haircutRatchet, 0.01, 1),
     };
 
+    // The pack already contains observed daily macro/quotes: never apply the event shock twice.
+    if (this.config.periodPack) this.state.macro = { ...base };
+
     // ---- 5) NPC 决策 ----
     let agentFlow = new Map<string, number>();
     if (this.state.agents.length > 0) {
@@ -480,7 +491,7 @@ export class GameEngine {
     const spxReturn = baseReturn + mods.indexReturn + spxFlowImpact;
 
     const newBars = new Map<string, Bar>();
-    for (const inst of INSTRUMENTS) {
+    for (const inst of INSTRUMENTS.filter(i => !this.config.periodPack || !!this.dataset.market?.series[i.id])) {
       const prevClose = this.state.prices.get(inst.id) ?? inst.startPrice;
       const prevAdv = this.adv20.get(inst.id) ?? inst.baseAdv;
 

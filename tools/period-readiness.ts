@@ -3,11 +3,13 @@ import { demoEvents } from '../packages/core/src/demo.ts';
 import { loadDataset } from '../packages/core/src/load-node.ts';
 import { tradingDaysBetween } from '../packages/core/src/time.ts';
 const raw=loadDataset();
-const data={...raw,events:demoEvents(raw.events,1)};
+const legacy={...raw,events:demoEvents(raw.events,1)};
 const candidates=[['2008-02-01','2008-03-31'],['2009-05-01','2009-06-30'],['2010-04-01','2010-06-30']];
 for(const [start,end] of candidates){
-  const calendarSupported=start>='2007-01-01' && end<='2009-12-31';
-  const expected=calendarSupported?tradingDaysBetween(start,end):[];
+  const pack=start==='2010-04-01'?raw.periodPacks?.['2010-q2-v1']:undefined;
+  const data=pack?{...legacy,events:[...legacy.events,...pack.events],market:pack.market}:legacy;
+  const calendarSupported=!!pack || (start>='2007-01-01' && end<='2009-12-31');
+  const expected=calendarSupported?tradingDaysBetween(start,end,pack?'nyse-2010':undefined):[];
   const events=data.events.filter(e=>e.date>=start && e.date<=end);
   const ids=new Set(events.map(e=>e.id));
   const historical=events.filter(e=>e.trigger.type!=='scheduled' || !e.trigger.modeOnly || e.trigger.modeOnly==='historical');

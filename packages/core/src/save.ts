@@ -1,3 +1,4 @@
+import { validatePeriodConfig } from './period-pack.ts';
 import type { GameConfig, Order, PlayerAction, RefinanceRequest } from './types.ts';
 
 export const SAVE_VERSION = 1;
@@ -40,9 +41,10 @@ export function validateSave(value: unknown): asserts value is GameSave {
       !Number.isInteger(s.turnIndex) || s.turnIndex < 0 || s.turnIndex > 2000 ||
       !Number.isFinite(s.equity) || !Array.isArray(s.actions) || s.actions.length > 2000 ||
       !Array.isArray(s.pendingOrders) || s.pendingOrders.length > 1000) throw new Error('存档数据无效');
+  validatePeriodConfig(s.config);
   for (const date of [s.config.startDate, s.config.endDate, s.date]) {
     if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) ||
-        date < '2007-01-01' || date > '2009-12-31') throw new Error('存档日期不受支持');
+        date < (s.config.periodPack ? '2010-04-01' : '2007-01-01') || date > (s.config.periodPack ? '2010-06-30' : '2009-12-31')) throw new Error('存档日期不受支持');
   }
   if (s.config.endDate < s.config.startDate) throw new Error('存档日期顺序无效');
   const checkRefinance = (request: RefinanceRequest | undefined, repay?: boolean) => {

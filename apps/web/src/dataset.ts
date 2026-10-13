@@ -1,3 +1,6 @@
+import q2Market from '../../../data/packs/2010-q2-v1/market.json';
+import q2Macro from '../../../data/packs/2010-q2-v1/macro.json';
+import q2Events from '../../../data/packs/2010-q2-v1/events.json';
 /**
  * 浏览器端数据集装配。
  *
@@ -21,6 +24,7 @@ import market from '../../../data/processed/market.json';
 import marketPatch from '../../../data/processed/early-ohlc.json';
 
 export const dataset: Dataset = {
+  periodPacks: { '2010-q2-v1': { id: '2010-q2-v1', market: q2Market as MarketData, macro: q2Macro, events: q2Events.events as EventCard[] } },
   marketPatch: marketPatch as unknown as MarketPatch,
   events: [
     ...(events2007 as unknown as { events: EventCard[] }).events,

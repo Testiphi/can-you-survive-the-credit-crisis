@@ -1,3 +1,4 @@
+import { beginnerPeriodConfig } from '../src/chapter.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/engine.ts';
@@ -5,10 +6,10 @@ import { loadDataset } from '../src/load-node.ts';
 import { DEMO_CHAPTERS, reviewRun } from '../src/chapter.ts';
 const data=loadDataset();
 const roles=['retail','hedge_fund','bank','insurer'] as const;
-test('demo covers five chronological chapters and all 20 chapter-role combinations can finish',()=>{
- assert.equal(DEMO_CHAPTERS.length,5);
+test('demo covers six chronological chapters and all 24 chapter-role combinations can finish',()=>{
+ assert.equal(DEMO_CHAPTERS.length,6);
  for(const chapter of DEMO_CHAPTERS) for(const identity of roles){
-  const e=new GameEngine(data,{config:{difficulty:0,identity,demoVersion:1,marketRevision:1,startDate:chapter.startDate,endDate:chapter.endDate}});
+  const e=new GameEngine(data,{config:{difficulty:0,identity,demoVersion:1,marketRevision:1,...beginnerPeriodConfig(chapter)}});
   if(identity==='insurer')e.requestReinsurance();
   if(identity==='bank')for(const p of e.state.player.positions.values())e.submitOrder({instrumentId:p.instrumentId,side:'sell',quantity:p.quantity,kind:'market',submittedAt:e.state.date});
   for(let i=0;i<5;i++)e.advance();

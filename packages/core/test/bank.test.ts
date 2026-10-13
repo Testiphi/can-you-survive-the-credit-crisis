@@ -1,3 +1,4 @@
+import { beginnerPeriodConfig } from '../src/chapter.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/engine.ts';
@@ -6,7 +7,7 @@ import { BEGINNER_PERIODS } from '../src/chapter.ts';
 import { loanLiabilities, createAccount } from '../src/portfolio.ts';
 import { initializeBank, settleBank } from '../src/bank.ts';
 const data = loadDataset();
-const make = (period: (typeof BEGINNER_PERIODS)[number] = BEGINNER_PERIODS[1]) => new GameEngine(data, { config: { difficulty: 0, identity: 'bank', startDate: period.startDate, endDate: period.endDate } });
+const make = (period: (typeof BEGINNER_PERIODS)[number] = BEGINNER_PERIODS[1]) => new GameEngine(data, { config: { difficulty: 0, identity: 'bank', ...beginnerPeriodConfig(period) } });
 test('bank opening loan funds assets without creating equity', () => {
   const e = make();
   const a = e.state.player;

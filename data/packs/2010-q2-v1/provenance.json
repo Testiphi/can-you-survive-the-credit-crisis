@@ -1,0 +1,91 @@
+{
+  "retrievedOn": "2026-10-13",
+  "packId": "2010-q2-v1",
+  "quotes": {
+    "SPX": {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1=1261440000&period2=1277942400&interval=1d",
+      "rawSha256": "60f5aca4b41be30594a111c020282a17752284090ce7cf8904761bdffffa7095",
+      "priceScale": 1,
+      "volumeScale": 1,
+      "overlapRange": [
+        "2009-12-22",
+        "2009-12-31"
+      ],
+      "overlapRows": 7,
+      "closeRelativeTolerance": 0.01
+    },
+    "GS": {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/GS?period1=1261440000&period2=1277942400&interval=1d",
+      "rawSha256": "aab8f5802ec37ed2051a70704684dee81ff31a7b70496eb975b349206b6576ea",
+      "priceScale": 1,
+      "volumeScale": 1,
+      "overlapRange": [
+        "2009-12-22",
+        "2009-12-31"
+      ],
+      "overlapRows": 7,
+      "closeRelativeTolerance": 0.01
+    },
+    "MS": {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/MS?period1=1261440000&period2=1277942400&interval=1d",
+      "rawSha256": "e99d3965625a7db0834edab59c8638534d69d13c944ee0e9e9ec75e44e70df2b",
+      "priceScale": 1,
+      "volumeScale": 1,
+      "overlapRange": [
+        "2009-12-22",
+        "2009-12-31"
+      ],
+      "overlapRows": 7,
+      "closeRelativeTolerance": 0.01
+    },
+    "JPM": {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/JPM?period1=1261440000&period2=1277942400&interval=1d",
+      "rawSha256": "dd37b4849132e83882b29d6fe102b987bc625b26d950518b0553d4ac33c0b99d",
+      "priceScale": 1,
+      "volumeScale": 1,
+      "overlapRange": [
+        "2009-12-22",
+        "2009-12-31"
+      ],
+      "overlapRows": 7,
+      "closeRelativeTolerance": 0.01
+    },
+    "C": {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/C?period1=1261440000&period2=1277942400&interval=1d",
+      "rawSha256": "21b76cce7797b150699e80ac50ade10f9bfb2ac6e77d306c399d1fffae4c489a",
+      "priceScale": 0.1,
+      "volumeScale": 10,
+      "overlapRange": [
+        "2009-12-22",
+        "2009-12-31"
+      ],
+      "overlapRows": 7,
+      "closeRelativeTolerance": 0.01
+    },
+    "AIG": {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/AIG?period1=1261440000&period2=1277942400&interval=1d",
+      "rawSha256": "3187cb02c431cd60672741327d1b703e9cab7e71608a99906b4bf3a30b0884ca",
+      "priceScale": 1,
+      "volumeScale": 1,
+      "overlapRange": [
+        "2009-12-22",
+        "2009-12-31"
+      ],
+      "overlapRows": 7,
+      "closeRelativeTolerance": 0.01
+    }
+  },
+  "macro": {
+    "vix": {
+      "source": "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv",
+      "field": "CLOSE",
+      "rawSha256": "965f14ae8d58079536b5491219b647e6385592be2c466e6ac849f6ace0bbe1f7"
+    },
+    "ted": {
+      "source": "https://fred.stlouisfed.org/data/TEDRATE",
+      "units": "percentage points",
+      "method": "transcribed from FRED table; missing 2010-04-05 and 2010-05-03 carry prior observation with tedAsOf; no interpolation"
+    },
+    "creditSpread": "teaching proxy, not observed HY OAS: 250 + 12 * max(0, VIX - 12) basis points"
+  }
+}

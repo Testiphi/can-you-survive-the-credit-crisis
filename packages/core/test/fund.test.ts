@@ -1,3 +1,4 @@
+import { beginnerPeriodConfig } from '../src/chapter.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/engine.ts';
@@ -7,7 +8,7 @@ import { fundAvailableCash } from '../src/fund.ts';
 import { nextTradingDay } from '../src/time.ts';
 const data = loadDataset();
 function fund(period: (typeof BEGINNER_PERIODS)[number] = BEGINNER_PERIODS[1]) {
-  return new GameEngine(data, { config: { difficulty: 0, identity: 'hedge_fund', startDate: period.startDate, endDate: period.endDate } });
+  return new GameEngine(data, { config: { difficulty: 0, identity: 'hedge_fund', ...beginnerPeriodConfig(period) } });
 }
 test('all periods support two cash redemptions without fake losses or drawdown', () => {
   for (const period of BEGINNER_PERIODS) {

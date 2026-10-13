@@ -16,8 +16,8 @@
   "scripts": {
     "test": "node --test \"packages/core/test/*.test.ts\"",
     "sim": "node packages/core/test/manual-sim.ts",
-    "validate": "python tools/validate_events.py",
+    "validate": "python tools/validate_events.py && python tools/validate_period_packs.py",
     "timeline": "python tools/gen_timeline.py --write",
-    "check": "python tools/validate_events.py && python tools/gen_timeline.py --check"
+    "check": "python tools/validate_events.py && python tools/validate_period_packs.py && python tools/gen_timeline.py --check"
   }
 }

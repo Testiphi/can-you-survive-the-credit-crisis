@@ -191,6 +191,7 @@ export function BeginnerApp({ engine, onChange, onRestart, storageNote, onExport
 
       {storageNote && <div className="b-actions-note" role="status">{storageNote}</div>}
       {!engine.config.demoVersion && <div className="b-actions-note">此存档按旧版规则与事件数据回放；新开局使用当前演示版修订。</div>}
+      {engine.config.periodPack && <div className="b-actions-note">2010 Q2 数据包：真实日线、VIX 与 TED；信用利差、系统压力及融资折扣为教学估算。TED 缺测日仅沿用此前观测值。闪崩以日线呈现，不支持盘中择价成交。</div>}
       {chapter && <div className="banner info">
         <b>{chapter.title}</b> · {engine.config.startDate} 至 {engine.config.endDate} · 剩余 {engine.isOver ? 0 : engine.remainingTurns} 个交易日
         <p>{chapter.briefing}</p>

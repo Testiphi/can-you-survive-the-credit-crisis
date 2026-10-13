@@ -21,6 +21,7 @@ export interface GameConfig {
   /** 省略表示原版回放；新演示版显式固定规则与事件修订版本。 */
   demoVersion?: 1;
   marketRevision?: 1;
+  periodPack?: '2010-q2-v1';
   /** Absent means the original 2007–2009 calendar, including legacy save replay. */
   calendar?: import('./time.ts').CalendarVersion;
   seed: number;

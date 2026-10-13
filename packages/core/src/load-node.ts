@@ -67,7 +67,12 @@ export function loadDataset(dir = eventsDir()): Dataset {
   if (!existsSync(dir)) {
     throw new Error(`事件目录不存在: ${dir}`);
   }
+  const packDir = join(repoRoot(), 'data', 'packs', '2010-q2-v1');
   return {
+    periodPacks: { '2010-q2-v1': { id: '2010-q2-v1',
+      market: readJson(join(packDir, 'market.json')),
+      macro: readJson(join(packDir, 'macro.json')),
+      events: readJson<{ events: EventCard[] }>(join(packDir, 'events.json')).events } },
     ...(existsSync(join(processedDir(), 'early-ohlc.json')) ? { marketPatch: readJson<import('./types.ts').MarketPatch>(join(processedDir(), 'early-ohlc.json')) } : {}),
     events: loadEvents(dir),
     institutions: loadInstitutions(dir),
